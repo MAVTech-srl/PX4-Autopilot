@@ -179,7 +179,7 @@ UavcanBatteryBridge::battery_aux_sub_cb(const uavcan::ReceivedDataStructure<ardu
 	_battery_status[instance].nominal_voltage = msg.nominal_voltage;
 	_battery_status[instance].time_remaining_s = math::isZero(_battery_status[instance].current_a) ? 0 :
 			(_battery_status[instance].remaining_capacity_wh /
-			 _battery_status[instance].nominal_voltage / _battery_status[instance].current_a * 3600);
+			 _battery_status[instance].nominal_voltage / fabsf(_battery_status[instance].current_a) * 3600);
 	_battery_status[instance].is_powering_off = msg.is_powering_off;
 
 	for (uint8_t i = 0; i < _battery_status[instance].cell_count; i++) {
