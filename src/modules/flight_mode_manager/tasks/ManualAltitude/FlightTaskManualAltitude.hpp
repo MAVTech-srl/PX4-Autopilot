@@ -44,6 +44,7 @@
 #include "Sticks.hpp"
 #include "StickTiltXY.hpp"
 #include <uORB/Subscription.hpp>
+#include <uORB/Publication.hpp>
 
 class FlightTaskManualAltitude : public FlightTask
 {
@@ -91,7 +92,13 @@ protected:
 					(ParamFloat<px4::params::MPC_LAND_SPEED>)
 					_param_mpc_land_speed, /**< desired downwards speed when approaching the ground */
 					(ParamFloat<px4::params::MPC_TKO_SPEED>)
-					_param_mpc_tko_speed /**< desired upwards speed when still close to the ground */
+					_param_mpc_tko_speed, /**< desired upwards speed when still close to the ground */
+					(ParamFloat<px4::params::CP_DIST_Z>)    _param_cp_dist_z,
+					(ParamFloat<px4::params::CP_HYST_Z>)    _param_cp_hyst_z,
+					(ParamFloat<px4::params::CP_STKTIME_Z>) _param_cp_stktime_z,
+					(ParamFloat<px4::params::MPC_JERK_MAX>) _param_mpc_jerk_max,
+					(ParamFloat<px4::params::MPC_ACC_UP_MAX>) _param_mpc_acc_up_max,
+					(ParamFloat<px4::params::MPC_ACC_DOWN_MAX>) _param_mpc_acc_down_max
 				       )
 private:
 	/**
@@ -102,6 +109,7 @@ private:
 	 * @param stopped is true if vehicle has stopped moving in D-direction
 	 */
 	void _terrainFollowing(bool apply_brake, bool stopped);
+	uORB::Publication<vehicle_command_s>	_vehicle_command_pub{ORB_ID(vehicle_command)};
 
 	/**
 	 * Minimum Altitude during range sensor operation.
@@ -122,6 +130,8 @@ private:
 	void setGearAccordingToSwitch();
 
 	bool _updateYawCorrection();
+
+	void _checkForcedLand();
 
 	uint8_t _reset_counter = 0; /**< counter for estimator resets in z-direction */
 

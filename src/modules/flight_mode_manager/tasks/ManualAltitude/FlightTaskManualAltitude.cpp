@@ -89,11 +89,45 @@ void FlightTaskManualAltitude::_updateConstraintsFromEstimator()
 void FlightTaskManualAltitude::_scaleSticks()
 {
 	// Use sticks input with deadzone and exponential curve for vertical velocity
-	const float vel_max_up = fminf(_param_mpc_z_vel_max_up.get(), _velocity_constraint_up);
+	const float vel_max_up   = fminf(_param_mpc_z_vel_max_up.get(), _velocity_constraint_up);
 	const float vel_max_down = fminf(_param_mpc_z_vel_max_dn.get(), _velocity_constraint_down);
-	const float vel_max_z = (_sticks.getPosition()(2) > 0.0f) ? vel_max_down : vel_max_up;
-	_velocity_setpoint(2) = vel_max_z * _sticks.getPositionExpo()(2);
+
+	const float stick_input = _sticks.getPositionExpo()(2); // positivo = giù (discesa), negativo = su (salita)
+
+	float vel_target = 0.f;
+
+	if (stick_input > 0.f) {
+		// discesa
+		vel_target = vel_max_down * stick_input;
+
+		// --- Collision Prevention Z ---
+		if (_param_cp_dist_z.get() > 0.f && _sub_vehicle_local_position.get().dist_bottom_valid && PX4_ISFINITE(_dist_to_bottom)) {
+			const float stop_distance = _dist_to_bottom - _param_cp_dist_z.get();
+
+			if (stop_distance <= 0.f) {
+				// troppo vicino all’ostacolo
+				vel_target = 0.f;
+
+			} else {
+				// riduco velocità in base allo spazio disponibile
+				const float safe_vel_down = math::trajectory::computeMaxSpeedFromDistance(
+					_param_mpc_jerk_max.get(),
+					_param_mpc_acc_down_max.get(),
+					stop_distance,
+					0.f);
+
+				vel_target = math::min(vel_target, safe_vel_down);
+			}
+		}
+
+	} else {
+		// salita
+		vel_target = vel_max_up * stick_input;
+	}
+
+	_velocity_setpoint(2) = vel_target;
 }
+
 
 void FlightTaskManualAltitude::_updateAltitudeLock()
 {
@@ -296,5 +330,73 @@ bool FlightTaskManualAltitude::update()
 	_constraints.want_takeoff = _checkTakeoff();
 	_max_distance_to_ground = INFINITY;
 
+	_checkForcedLand();
+
 	return ret;
+}
+
+
+void FlightTaskManualAltitude::_checkForcedLand()
+{
+    static hrt_abstime stick_down_start = 0;
+    static hrt_abstime blocked_start = 0;
+
+    const float stick_input = _sticks.getPositionExpo()(2); // positivo = giù
+    const bool stick_down = (stick_input > 0.8f);
+
+    // condizione di "blocco": drone è fermo da un po' e vicino alla soglia CP_DIST_Z
+    const bool near_limit = (_param_cp_dist_z.get() > 0.f) &&
+                            _sub_vehicle_local_position.get().dist_bottom_valid &&
+                            PX4_ISFINITE(_dist_to_bottom) &&
+                            (_dist_to_bottom <= (_param_cp_dist_z.get() + 0.2f)); // margine 20cm
+
+    const bool low_vel = fabsf(_velocity(2)) < 0.3f;   // velocità verticale bassa
+    const bool blocked = (near_limit && low_vel);
+
+    if (blocked) {
+        if (blocked_start == 0) {
+            blocked_start = hrt_absolute_time(); // inizio periodo bloccato
+        }
+    } else {
+        blocked_start = 0; // reset se non più bloccato
+    }
+
+    if (stick_down && blocked) {
+        if (stick_down_start == 0) {
+            stick_down_start = hrt_absolute_time();
+        }
+
+        const float hold_time_s = _param_cp_stktime_z.get();
+
+        // deve essere bloccato da almeno 0.5s + stick in giù per X secondi
+        if ((hrt_elapsed_time(&blocked_start) > 500000) &&
+            (hrt_elapsed_time(&stick_down_start) > (hold_time_s * 1e6f))) {
+
+            
+			vehicle_command_s vcmd{};
+            vcmd.timestamp = hrt_absolute_time();
+            vcmd.param1 = NAN;
+            vcmd.param2 = NAN;
+            vcmd.param3 = NAN;
+            vcmd.param4 = NAN;
+            vcmd.param5 = NAN;
+            vcmd.param6 = NAN;
+            vcmd.param7 = NAN;
+            vcmd.command = vehicle_command_s::VEHICLE_CMD_NAV_LAND;
+            vcmd.target_system = 1;
+            vcmd.target_component = 1;
+            vcmd.source_system = 1;
+            vcmd.source_component = 1;
+            vcmd.from_external = false;
+
+            _vehicle_command_pub.publish(vcmd);
+            PX4_INFO("FORCED LAND triggered: dist=%.2f vel=%.2f stick=%.2f",
+                     (double)_dist_to_bottom,
+                     (double)_velocity(2),
+                     (double)stick_input);
+        }
+
+    } else {
+        stick_down_start = 0; // reset se non insiste più con lo stick
+    }
 }

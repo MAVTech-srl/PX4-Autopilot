@@ -84,3 +84,46 @@ PARAM_DEFINE_FLOAT(CP_GUIDE_ANG, 30.f);
  * @group Multicopter Position Control
  */
 PARAM_DEFINE_INT32(CP_GO_NO_DATA, 0);
+
+/**
+ * Collision Prevention Z: hard stop distance
+ *
+ * Distanza minima dal terreno sotto la quale non scendere (m).
+ *
+ * @unit m
+ * @min -1
+ * @max 10.0
+ * @decimal 2
+ * @increment 0.1
+ * @group Collision Prevention
+ */
+PARAM_DEFINE_FLOAT(CP_DIST_Z, -1.0f);
+
+/**
+ * Collision Prevention Z: hysteresis
+ *
+ * Margine per evitare oscillazioni (m).
+ *
+ * @unit m
+ * @min 0.05
+ * @max 1.0
+ * @decimal 2
+ * @increment 0.05
+ * @group Collision Prevention
+ */
+PARAM_DEFINE_FLOAT(CP_HYST_Z, 0.2f);
+
+/**
+ * Collision Prevention Z: stick hold time
+ *
+ * Tempo per forzare la discesa tenendo lo stick premuto (s).
+ *
+ * @unit s
+ * @min 0.0
+ * @max 10.0
+ * @decimal 1
+ * @increment 0.5
+ * @group Collision Prevention
+ */
+PARAM_DEFINE_FLOAT(CP_STKTIME_Z, 2.0f);
+
