@@ -1,0 +1,12 @@
+menuconfig MODULES_CAMERA_INPUT_RC
+    bool "camera_input_rc"
+    default n
+    ---help---
+        Enable support for Camera Input RC
+
+menuconfig USER_CAMERA_INPUT_RC
+    bool "camera_input_rc running as userspace module"
+    default y
+    depends on BOARD_PROTECTED && MODULES_CAMERA_INPUT_RC
+    ---help---
+        Put camera_input_rc in userspace memory

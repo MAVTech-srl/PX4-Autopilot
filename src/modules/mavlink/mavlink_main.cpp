@@ -1640,6 +1640,7 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 
 	/* fallthrough */
 	case MAVLINK_MODE_CUSTOM:
+		configure_stream_local("ATTITUDE", 100.0f);
 		//stream nothing
 		break;
 
