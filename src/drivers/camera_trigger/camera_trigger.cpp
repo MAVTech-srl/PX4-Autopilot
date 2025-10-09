@@ -759,10 +759,6 @@ unknown_cmd:
 		// One-shot trigger
 		shoot_once();
 		_one_shot = false;
-
-		if (_test_shot) {
-			_test_shot = false;
-		}
 	}
 
 	// Command ACK handling
@@ -824,6 +820,7 @@ CameraTrigger::engage(void *arg)
 
 	if (trig->_test_shot) {
 		// do not send messages or increment frame count for test shots
+		trig->_test_shot = false;
 		return;
 	}
 

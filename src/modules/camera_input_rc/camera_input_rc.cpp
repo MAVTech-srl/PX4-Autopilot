@@ -82,7 +82,7 @@ void CameraInputRC::run()
 			default: break;
 			}
 			// aux = indice aux selezionato
-			PX4_INFO("AUX%i value = %.2f (thr=%.2f)", aux, (double)val, (double)threshold);
+			
 
 			// Stato attuale ON/OFF rispetto alla soglia
 			bool state = (val > threshold);
@@ -95,13 +95,13 @@ void CameraInputRC::run()
 
 				// param5 = shutter control
 				vcmd.param5 = 1.0f;
+				vcmd.param7 = 0.0f;
 
 				vcmd.target_system = 1;
 				vcmd.target_component = 1;
 
 				_vcmd_pub.publish(vcmd);
 
-				PX4_INFO("Camera trigger via RC (AUX%i)", aux);
 			}
 
 			_last_state = state;

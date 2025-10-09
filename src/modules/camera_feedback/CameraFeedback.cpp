@@ -62,6 +62,7 @@ CameraFeedback::init()
 void
 CameraFeedback::Run()
 {
+	
 	if (should_exit()) {
 		_trigger_sub.unregisterCallback();
 		exit_and_cleanup();
@@ -70,7 +71,9 @@ CameraFeedback::Run()
 
 	camera_trigger_s trig{};
 
+
 	while (_trigger_sub.update(&trig)) {
+
 
 		// update geotagging subscriptions
 		vehicle_global_position_s gpos{};
@@ -82,7 +85,6 @@ CameraFeedback::Run()
 		if (trig.timestamp == 0 ||
 		    gpos.timestamp == 0 ||
 		    att.timestamp == 0) {
-
 			// reject until we have valid data
 			continue;
 		}
@@ -91,7 +93,6 @@ CameraFeedback::Run()
 			// Ignore triggers that are not feedback when camera capture feedback is enabled
 			continue;
 		}
-
 		camera_capture_s capture{};
 
 		// Fill timestamps

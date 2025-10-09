@@ -8,3 +8,8 @@
 PX4_SIM_MODEL=${PX4_SIM_MODEL:=x500_depth}
 
 . ${R}etc/init.d-posix/airframes/4001_gz_x500
+
+
+camera_feedback start
+
+camera_trigger start
