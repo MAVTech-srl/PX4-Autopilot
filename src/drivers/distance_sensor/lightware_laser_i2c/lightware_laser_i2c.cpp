@@ -582,6 +582,11 @@ extern "C" __EXPORT int lightware_laser_i2c_main(int argc, char *argv[])
 		}
 	}
 
+	// Se l’utente NON ha passato -R, usa il parametro SENS_LW_ROT
+	int32_t p = (int32_t)distance_sensor_s::ROTATION_DOWNWARD_FACING;
+	(void)param_get(param_find("LW_RNG_ROT"), &p);
+	cli.rotation = (Rotation)p;
+
 	const char *verb = cli.optArg();
 
 	if (!verb) {

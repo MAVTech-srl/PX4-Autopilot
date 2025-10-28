@@ -819,6 +819,15 @@ PARAM_DEFINE_INT32(COM_ARM_SDCARD, 1);
 PARAM_DEFINE_INT32(COM_ARM_HFLT_CHK, 1);
 
 /**
+ * Enable arms closed check
+ *
+ *
+ * @group Commander
+ * @boolean
+ */
+PARAM_DEFINE_INT32(CLOSED_ARMS_CHK, 0);
+
+/**
  * Enable Drone ID system detection and health check
  *
  * This check detects if the Open Drone ID system is missing.

@@ -69,6 +69,7 @@ px4_add_library(health_and_arming_checks
 	checks/windCheck.cpp
 
 	checks/externalChecks.cpp
+	checks/armsStatusCheck.cpp
 )
 add_dependencies(health_and_arming_checks mode_util)
 

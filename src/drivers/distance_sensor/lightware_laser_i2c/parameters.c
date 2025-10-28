@@ -60,3 +60,27 @@ PARAM_DEFINE_INT32(SENS_EN_SF1XX, 0);
  * @max 2
  */
 PARAM_DEFINE_INT32(SF1XX_MODE, 1);
+
+
+/**
+ * Lightware Laser Orientation (serial)
+ *
+ * Valori come da DistanceSensor.msg (body frame):
+ *
+ * @reboot_required true
+ * @group Sensors
+ * @min 0
+ * @max 25
+ * @value 0  ROTATION_YAW_0 / FORWARD_FACING
+ * @value 1  ROTATION_YAW_45
+ * @value 2  ROTATION_YAW_90 / RIGHT_FACING
+ * @value 3  ROTATION_YAW_135
+ * @value 4  ROTATION_YAW_180 / BACKWARD_FACING
+ * @value 5  ROTATION_YAW_225
+ * @value 6  ROTATION_YAW_270 / LEFT_FACING
+ * @value 7  ROTATION_YAW_315
+ * @value 24 ROTATION_UPWARD_FACING
+ * @value 25 ROTATION_DOWNWARD_FACING (default)
+ * @value 100 ROTATION_CUSTOM (usa anche il quaternion 'q')
+ */
+PARAM_DEFINE_INT32(LW_RNG_ROT, 25);

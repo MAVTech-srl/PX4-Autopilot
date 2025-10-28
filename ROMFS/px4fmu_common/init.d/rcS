@@ -634,6 +634,10 @@ else
 	then
 		zenoh start
 	fi
+	if param compare -s CLOSED_ARMS_EN 1
+	then
+		esp32_stick_i2c start -X -b 4 -a 0x42
+	fi
 
 #
 # End of autostart.

@@ -73,6 +73,7 @@
 #include "checks/offboardCheck.hpp"
 #include "checks/openDroneIDCheck.hpp"
 #include "checks/externalChecks.hpp"
+#include "checks/armsStatusCheck.hpp"
 
 class HealthAndArmingChecks : public ModuleParams
 {
@@ -157,6 +158,7 @@ private:
 	RcAndDataLinkChecks _rc_and_data_link_checks;
 	VtolChecks _vtol_checks;
 	OffboardChecks _offboard_checks;
+	ArmsStatusCheck _arms_status_checks;
 #ifndef CONSTRAINED_FLASH
 	ExternalChecks _external_checks;
 #endif
@@ -197,5 +199,6 @@ private:
 		&_flight_time_checks,
 		&_rc_and_data_link_checks,
 		&_vtol_checks,
+		&_arms_status_checks,
 	};
 };

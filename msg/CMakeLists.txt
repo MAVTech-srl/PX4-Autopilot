@@ -47,6 +47,7 @@ set(msg_files
 	AdcReport.msg
 	Airspeed.msg
 	AirspeedWind.msg
+	ArmsStatus.msg
 	AutotuneAttitudeControlStatus.msg
 	ButtonEvent.msg
 	CameraCapture.msg
