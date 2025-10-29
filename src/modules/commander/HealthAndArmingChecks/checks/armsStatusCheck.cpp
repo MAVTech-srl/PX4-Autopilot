@@ -26,21 +26,6 @@ void ArmsStatusCheck::checkAndReport(const Context &context, Report &reporter)
                 }
             }
 
-        } else {
-            // Nessun messaggio ricevuto → errore di comunicazione
-            /* EVENT
-            */
-            reporter.armingCheckFailure(
-                NavModes::All,
-                health_component_t::system,
-                events::ID("check_arms_missing"),
-                events::Log::Error,
-                "Nessun dato da ESP32 stick");
-
-            if (reporter.mavlink_log_pub()) {
-                mavlink_log_critical(reporter.mavlink_log_pub(),
-                    "Preflight Fail: Nessun dato da ESP32 stick");
-            }
         }
     }
 }
