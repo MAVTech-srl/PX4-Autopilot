@@ -409,6 +409,16 @@
 /* This board provides a DMA pool and APIs */
 #define BOARD_DMA_ALLOC_POOL_SIZE 5120
 
+
+/* --- NeoPixel (WS2812) su FMU_CH6: PD14 / TIM4_CH3 / DMA1 Stream7 CH2 --- */
+#define BOARD_HAS_N_S_RGB_LED      3        /* <-- metti qui il numero reale di LED nella strip */
+#define S_RGB_LED_TIMER            4        /* TIM4 */
+#define S_RGB_LED_CHANNEL          3        /* CH3 */
+/* niente S_RGB_LED_CHANNELN: TIM4 CH3 non usa l'uscita complementare */
+#define S_RGB_LED_TIM_GPIO         GPIO_TIM4_CH3OUT_2   /* PD14 alternate function TIM4_CH3 */
+#define S_RGB_LED_DMA              DMAMAP_TIM4_CH3      /* DMA1 Stream7, Channel2 per TIM4_CH3 */
+
+
 /* This board provides the board_on_reset interface */
 
 #define BOARD_HAS_ON_RESET 1

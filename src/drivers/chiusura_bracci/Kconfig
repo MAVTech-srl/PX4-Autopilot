@@ -2,5 +2,5 @@ config DRIVERS_CHIUSURA_BRACCI
 	bool "chiusura_bracci"
 	default n
 	---help---
-	  Simple I2C interface to an ESP32 Nano that reports two digital button states.
+	  Simple I2C interface to an ESP32 Nano that reports two analog hall states.
 	  I2C address: 0x42
