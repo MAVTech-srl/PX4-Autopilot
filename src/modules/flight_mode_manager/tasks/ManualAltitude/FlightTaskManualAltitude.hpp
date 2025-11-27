@@ -45,6 +45,8 @@
 #include "StickTiltXY.hpp"
 #include <uORB/Subscription.hpp>
 #include <uORB/Publication.hpp>
+#include <uORB/topics/vehicle_status.h>
+
 
 class FlightTaskManualAltitude : public FlightTask
 {
@@ -81,6 +83,8 @@ protected:
 
 	float _velocity_constraint_up{INFINITY};
 	float _velocity_constraint_down{INFINITY};
+	bool _cp_z_brake_active{false};
+
 
 	DEFINE_PARAMETERS_CUSTOM_PARENT(FlightTask,
 					(ParamFloat<px4::params::MPC_HOLD_MAX_Z>) _param_mpc_hold_max_z,
@@ -110,6 +114,8 @@ private:
 	 */
 	void _terrainFollowing(bool apply_brake, bool stopped);
 	uORB::Publication<vehicle_command_s>	_vehicle_command_pub{ORB_ID(vehicle_command)};
+	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
+
 
 	/**
 	 * Minimum Altitude during range sensor operation.
@@ -137,6 +143,8 @@ private:
 
 	float _min_distance_to_ground{(float)(-INFINITY)}; /**< min distance to ground constraint */
 	float _max_distance_to_ground{(float)INFINITY};  /**< max distance to ground constraint */
+	bool _forced_land_triggered{false};
+
 
 	/**
 	 * Distance to ground during terrain following.

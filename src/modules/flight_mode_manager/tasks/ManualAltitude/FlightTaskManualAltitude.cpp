@@ -96,17 +96,24 @@ void FlightTaskManualAltitude::_scaleSticks()
 
 	float vel_target = 0.f;
 
+	// di default nessun freno CP_Z
+	_cp_z_brake_active = false;
+
 	if (stick_input > 0.f) {
 		// discesa
 		vel_target = vel_max_down * stick_input;
 
 		// --- Collision Prevention Z ---
-		if (_param_cp_dist_z.get() > 0.f && _sub_vehicle_local_position.get().dist_bottom_valid && PX4_ISFINITE(_dist_to_bottom)) {
+		if (_param_cp_dist_z.get() > 0.f &&
+		    _sub_vehicle_local_position.get().dist_bottom_valid &&
+		    PX4_ISFINITE(_dist_to_bottom)) {
+
 			const float stop_distance = _dist_to_bottom - _param_cp_dist_z.get();
 
-			if (stop_distance <= 0.f) {
-				// troppo vicino all’ostacolo
+			if (stop_distance <= 0.12f) {
+				// troppo vicino all’ostacolo: blocca la discesa
 				vel_target = 0.f;
+				_cp_z_brake_active = true;
 
 			} else {
 				// riduco velocità in base allo spazio disponibile
@@ -128,17 +135,33 @@ void FlightTaskManualAltitude::_scaleSticks()
 	_velocity_setpoint(2) = vel_target;
 }
 
-
 void FlightTaskManualAltitude::_updateAltitudeLock()
 {
 	// Depending on stick inputs and velocity, position is locked.
 	// If not locked, altitude setpoint is set to NAN.
+	if (_cp_z_brake_active) {
+		// Se non avevamo ancora un setpoint di posizione, bloccalo ora
+		if (!PX4_ISFINITE(_position_setpoint(2))) {
+			_position_setpoint(2) = _position(2);
+		}
+
+		// Non comandiamo più discesa
+		_velocity_setpoint(2) = 0.f;
+
+		// Continua a rispettare il vincolo di massima quota
+		_respectMaxAltitude();
+
+		// Non far eseguire la logica sotto (che potrebbe mettere NAN)
+		return;
+	}
+
 
 	// Check if user wants to break
 	const bool apply_brake = fabsf(_sticks.getPositionExpo()(2)) <= FLT_EPSILON;
 
 	// Check if vehicle has stopped
-	const bool stopped = (_param_mpc_hold_max_z.get() < FLT_EPSILON || fabsf(_velocity(2)) < _param_mpc_hold_max_z.get());
+	const bool stopped = (_param_mpc_hold_max_z.get() < FLT_EPSILON
+			      || fabsf(_velocity(2)) < _param_mpc_hold_max_z.get());
 
 	// Manage transition between use of distance to ground and distance to local origin
 	// when terrain hold behaviour has been selected.
@@ -180,7 +203,6 @@ void FlightTaskManualAltitude::_updateAltitudeLock()
 				}
 			}
 		}
-
 	}
 
 	if ((_param_mpc_alt_mode.get() == 1 || _terrain_hold) && PX4_ISFINITE(_dist_to_bottom)) {
@@ -220,6 +242,8 @@ void FlightTaskManualAltitude::_updateAltitudeLock()
 
 	_respectMaxAltitude();
 }
+
+
 
 void FlightTaskManualAltitude::_respectMinAltitude()
 {
@@ -338,65 +362,98 @@ bool FlightTaskManualAltitude::update()
 
 void FlightTaskManualAltitude::_checkForcedLand()
 {
-    static hrt_abstime stick_down_start = 0;
-    static hrt_abstime blocked_start = 0;
+	using namespace time_literals;
 
-    const float stick_input = _sticks.getPositionExpo()(2); // positivo = giù
-    const bool stick_down = (stick_input > 0.8f);
+	static hrt_abstime stick_down_start = 0;
+	static hrt_abstime blocked_start = 0;
+	static hrt_abstime arming_time = 0;
 
-    // condizione di "blocco": drone è fermo da un po' e vicino alla soglia CP_DIST_Z
-    const bool near_limit = (_param_cp_dist_z.get() > 0.f) &&
-                            _sub_vehicle_local_position.get().dist_bottom_valid &&
-                            PX4_ISFINITE(_dist_to_bottom) &&
-                            (_dist_to_bottom <= (_param_cp_dist_z.get() + 0.2f)); // margine 20cm
+	// --- Stato veicolo ---
+	vehicle_status_s vstatus{};
+	_vehicle_status_sub.copy(&vstatus);   // SEMPRE, senza if!
 
-    const bool low_vel = fabsf(_velocity(2)) < 0.3f;   // velocità verticale bassa
-    const bool blocked = (near_limit && low_vel);
 
-    if (blocked) {
-        if (blocked_start == 0) {
-            blocked_start = hrt_absolute_time(); // inizio periodo bloccato
-        }
-    } else {
-        blocked_start = 0; // reset se non più bloccato
-    }
+	// Registra il tempo di arming
+	if (vstatus.arming_state == vehicle_status_s::ARMING_STATE_ARMED && arming_time == 0) {
+		arming_time = hrt_absolute_time();
+	}
 
-    if (stick_down && blocked) {
-        if (stick_down_start == 0) {
-            stick_down_start = hrt_absolute_time();
-        }
+	if (vstatus.arming_state != vehicle_status_s::ARMING_STATE_ARMED) {
+		arming_time = 0;
+		stick_down_start = 0;
+		blocked_start = 0;
+		_forced_land_triggered = false;   // meglio: reset, non blocco
+		return;
+	}
 
-        const float hold_time_s = _param_cp_stktime_z.get();
 
-        // deve essere bloccato da almeno 0.5s + stick in giù per X secondi
-        if ((hrt_elapsed_time(&blocked_start) > 500000) &&
-            (hrt_elapsed_time(&stick_down_start) > (hold_time_s * 1e6f))) {
+	// Evita trigger nei primi 3 s dopo l'arming (arming + spool-up)
+	if (hrt_elapsed_time(&arming_time) < 3_s) {
+		return;
+	}
 
-            
-			vehicle_command_s vcmd{};
-            vcmd.timestamp = hrt_absolute_time();
-            vcmd.param1 = NAN;
-            vcmd.param2 = NAN;
-            vcmd.param3 = NAN;
-            vcmd.param4 = NAN;
-            vcmd.param5 = NAN;
-            vcmd.param6 = NAN;
-            vcmd.param7 = NAN;
-            vcmd.command = vehicle_command_s::VEHICLE_CMD_NAV_LAND;
-            vcmd.target_system = 1;
-            vcmd.target_component = 1;
-            vcmd.source_system = 1;
-            vcmd.source_component = 1;
-            vcmd.from_external = false;
+	// Se già in LAND → non retriggerare
+	if (_forced_land_triggered) {
+    	// abbiamo già mandato un LAND, non fare altro
+		return;
+	}
+	
 
-            _vehicle_command_pub.publish(vcmd);
-            PX4_INFO("FORCED LAND triggered: dist=%.2f vel=%.2f stick=%.2f",
-                     (double)_dist_to_bottom,
-                     (double)_velocity(2),
-                     (double)stick_input);
-        }
+	// --- Stick input ---
+	const float stick_input = _sticks.getPositionExpo()(2); // positivo = giù
+	const bool stick_down = (stick_input > 0.8f);
 
-    } else {
-        stick_down_start = 0; // reset se non insiste più con lo stick
-    }
+	// Reset se lo stick non è più tutto giù
+	if (!stick_down) {
+		stick_down_start = 0;
+		blocked_start = 0;
+		_forced_land_triggered = false;
+		return;
+	}
+
+	
+	// --- Condizione bloccato: CP_Z sta frenando ---
+	const bool blocked = _cp_z_brake_active && (fabsf(_velocity(2)) < 0.3f);
+
+
+	// Timer blocco CP_Z
+	if (blocked) {
+		if (blocked_start == 0) {
+			blocked_start = hrt_absolute_time();
+		}
+	} else {
+		blocked_start = 0;
+	}
+
+	// Timer stick giù
+	if (stick_down && stick_down_start == 0) {
+		stick_down_start = hrt_absolute_time();
+	}
+
+	// --- Condizione per trigger LAND ---
+	const float hold_time_s = _param_cp_stktime_z.get();
+
+	if (stick_down && blocked && !_forced_land_triggered &&
+	    hrt_elapsed_time(&blocked_start) > 500_ms &&
+	    hrt_elapsed_time(&stick_down_start) > (hold_time_s * 1_s)) {
+
+		vehicle_command_s cmd{};
+		cmd.timestamp = hrt_absolute_time();
+		cmd.command = vehicle_command_s::VEHICLE_CMD_NAV_LAND;
+		cmd.target_system = 1;
+		cmd.target_component = 1;
+		cmd.source_system = 1;
+		cmd.source_component = 1;
+		cmd.from_external = false;
+
+		_vehicle_command_pub.publish(cmd);
+
+		PX4_INFO("FORCED LAND triggered (dist=%.2f vel=%.2f)",
+			 (double)_dist_to_bottom,
+			 (double)_velocity(2));
+
+		_forced_land_triggered = true;
+	}
+
+	
 }
