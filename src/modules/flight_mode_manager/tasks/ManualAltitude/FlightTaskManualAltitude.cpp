@@ -92,16 +92,18 @@ void FlightTaskManualAltitude::_scaleSticks()
 	const float vel_max_up   = fminf(_param_mpc_z_vel_max_up.get(), _velocity_constraint_up);
 	const float vel_max_down = fminf(_param_mpc_z_vel_max_dn.get(), _velocity_constraint_down);
 
-	const float stick_input = _sticks.getPositionExpo()(2); // positivo = giù (discesa), negativo = su (salita)
-
+	const float stick_input = _sticks.getThrottleZeroCenteredExpo();
+	 // positivo = giù (discesa), negativo = su (salita)
 	float vel_target = 0.f;
 
 	// di default nessun freno CP_Z
 	_cp_z_brake_active = false;
 
-	if (stick_input > 0.f) {
+
+	if (stick_input < 0.f) {
 		// discesa
-		vel_target = vel_max_down * stick_input;
+		const float down_cmd = -stick_input; 
+		vel_target = vel_max_down * down_cmd;
 
 		// --- Collision Prevention Z ---
 		if (_param_cp_dist_z.get() > 0.f &&
@@ -109,30 +111,36 @@ void FlightTaskManualAltitude::_scaleSticks()
 		    PX4_ISFINITE(_dist_to_bottom)) {
 
 			const float stop_distance = _dist_to_bottom - _param_cp_dist_z.get();
-
-			if (stop_distance <= 0.12f) {
+			
+			if (stop_distance < 0.f) {
 				// troppo vicino all’ostacolo: blocca la discesa
 				vel_target = 0.f;
 				_cp_z_brake_active = true;
 
 			} else {
 				// riduco velocità in base allo spazio disponibile
-				const float safe_vel_down = math::trajectory::computeMaxSpeedFromDistance(
-					_param_mpc_jerk_max.get(),
-					_param_mpc_acc_down_max.get(),
-					stop_distance,
-					0.f);
+				float safe_vel_down = math::trajectory::computeMaxSpeedFromDistance(
+						_param_mpc_jerk_max.get(),
+						_param_mpc_acc_down_max.get(),
+						stop_distance,
+						0.f);
+
+				// velocità minima → 0.05 m/s (5 cm/s)
+				const float vel_min = 0.2f;
+				safe_vel_down = math::max(safe_vel_down, vel_min);
 
 				vel_target = math::min(vel_target, safe_vel_down);
+
 			}
 		}
 
 	} else {
 		// salita
-		vel_target = vel_max_up * stick_input;
+		vel_target = -vel_max_up * stick_input;
 	}
 
 	_velocity_setpoint(2) = vel_target;
+
 }
 
 void FlightTaskManualAltitude::_updateAltitudeLock()
@@ -157,7 +165,8 @@ void FlightTaskManualAltitude::_updateAltitudeLock()
 
 
 	// Check if user wants to break
-	const bool apply_brake = fabsf(_sticks.getPositionExpo()(2)) <= FLT_EPSILON;
+	const bool apply_brake = fabsf(_sticks.getThrottleZeroCenteredExpo()) <= FLT_EPSILON;
+
 
 	// Check if vehicle has stopped
 	const bool stopped = (_param_mpc_hold_max_z.get() < FLT_EPSILON
@@ -332,17 +341,29 @@ void FlightTaskManualAltitude::_ekfResetHandlerHagl(float delta_hagl)
 
 void FlightTaskManualAltitude::_updateSetpoints()
 {
-	_stick_yaw.generateYawSetpoint(_yawspeed_setpoint, _yaw_setpoint, _sticks.getYawExpo(), _yaw, _deltatime, _unaided_yaw);
-	_acceleration_setpoint.xy() = _stick_tilt_xy.generateAccelerationSetpoints(_sticks.getPitchRoll(), _deltatime, _yaw,
-				      _yaw_setpoint);
+	_updateYawSetpoint();
+	_updateXYSetpoint();
 	_updateAltitudeLock();
 	_respectGroundSlowdown();
+}
+
+void FlightTaskManualAltitude::_updateYawSetpoint()
+{
+	_stick_yaw.generateYawSetpoint(_yawspeed_setpoint, _yaw_setpoint,
+				       _sticks.getYawExpo(), _yaw, _deltatime,
+				       _unaided_yaw);
+}
+
+void FlightTaskManualAltitude::_updateXYSetpoint()
+{
+	_acceleration_setpoint.xy() = _stick_tilt_xy.generateAccelerationSetpoints(
+					      _sticks.getPitchRoll(), _deltatime, _yaw, _yaw_setpoint);
 }
 
 bool FlightTaskManualAltitude::_checkTakeoff()
 {
 	// stick is deflected above 65% throttle (throttle stick is in the range [-1,1])
-	return _sticks.getPosition()(2) < -0.3f;
+	return _sticks.getThrottleZeroCentered() > 0.3f;
 }
 
 bool FlightTaskManualAltitude::update()
@@ -400,8 +421,9 @@ void FlightTaskManualAltitude::_checkForcedLand()
 	
 
 	// --- Stick input ---
-	const float stick_input = _sticks.getPositionExpo()(2); // positivo = giù
-	const bool stick_down = (stick_input > 0.8f);
+	const float stick_input = _sticks.getThrottleZeroCenteredExpo();
+	// positivo = giù
+	const bool stick_down = (stick_input < -0.8f);
 
 	// Reset se lo stick non è più tutto giù
 	if (!stick_down) {
@@ -434,7 +456,7 @@ void FlightTaskManualAltitude::_checkForcedLand()
 	const float hold_time_s = _param_cp_stktime_z.get();
 
 	if (stick_down && blocked && !_forced_land_triggered &&
-	    hrt_elapsed_time(&blocked_start) > 500_ms &&
+	    hrt_elapsed_time(&blocked_start) > 100_ms &&
 	    hrt_elapsed_time(&stick_down_start) > (hold_time_s * 1_s)) {
 
 		vehicle_command_s cmd{};
@@ -451,8 +473,15 @@ void FlightTaskManualAltitude::_checkForcedLand()
 		PX4_INFO("FORCED LAND triggered (dist=%.2f vel=%.2f)",
 			 (double)_dist_to_bottom,
 			 (double)_velocity(2));
+		
+		// ---- RESET IMMEDIATO DI TUTTO ----
+		_forced_land_triggered = false;
+		stick_down_start = 0;
+		blocked_start = 0;
+		arming_time = 0;
+		_cp_z_brake_active = false;
+		_dist_to_ground_lock = NAN;
 
-		_forced_land_triggered = true;
 	}
 
 	

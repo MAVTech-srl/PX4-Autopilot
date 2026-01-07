@@ -64,6 +64,8 @@ protected:
 
 	virtual void _updateSetpoints(); /**< updates all setpoints */
 	virtual void _scaleSticks(); /**< scales sticks to velocity in z */
+	virtual void _updateYawSetpoint();
+	virtual void _updateXYSetpoint();
 	bool _checkTakeoff() override;
 	void _updateConstraintsFromEstimator();
 

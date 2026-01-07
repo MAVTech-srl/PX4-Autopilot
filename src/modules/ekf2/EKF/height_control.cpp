@@ -94,9 +94,9 @@ void Ekf::checkHeightSensorRefFallback()
 
 	case HeightSensor::RANGE:
 		fallback_list[0] = HeightSensor::RANGE;
-		fallback_list[1] = HeightSensor::EV;
+		fallback_list[3] = HeightSensor::EV;
 		fallback_list[2] = HeightSensor::BARO;
-		fallback_list[3] = HeightSensor::GNSS;
+		fallback_list[1] = HeightSensor::GNSS;
 		break;
 
 	case HeightSensor::EV:
