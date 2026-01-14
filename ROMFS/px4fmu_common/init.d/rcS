@@ -636,9 +636,8 @@ else
 	fi
 	if param compare -s CLOSED_ARMS_EN 1
 	then
-		esp32_hall_i2c start -X -b 4 -a 0x42
+		esp32_hall_i2c start -X -b 2 -a 0x42
 	fi
-	neopixel start
 
 
 #

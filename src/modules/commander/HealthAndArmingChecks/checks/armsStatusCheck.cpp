@@ -1,43 +1,65 @@
 #include "armsStatusCheck.hpp"
-#include <cstdio>    // per snprintf
-#include <cstring>   // per strcat
+#include <cstdio>
+#include <cstdint>
 
 void ArmsStatusCheck::checkAndReport(const Context &context, Report &reporter)
 {
-	if (_param_arms_closed_check.get()) {
+	if (!_param_arms_closed_check.get()) {
+		return;
+	}
 
-		arms_status_s arms{};
+	arms_status_s arms{};
 
-		if (_arms_status_sub.copy(&arms)) {
+	if (!_arms_status_sub.copy(&arms)) {
+		return;
+	}
 
-			char open_arms[32] = "";
-			bool any_open = false;
+	char open_arms[32];
+	open_arms[0] = '\0';
+	size_t used = 0;
 
-			if (arms.hall1 == 0) { strcat(open_arms, "1 "); any_open = true; }
-			if (arms.hall2 == 0) { strcat(open_arms, "2 "); any_open = true; }
-			if (arms.hall3 == 0) { strcat(open_arms, "3 "); any_open = true; }
-			if (arms.hall4 == 0) { strcat(open_arms, "4 "); any_open = true; }
-
-			if (any_open) {
-				char msg[64];
-				snprintf(msg, sizeof(msg), "Bracci non chiusi: %s", open_arms);
-
-				/* EVENT
-				 * @description
-				 * Maestro chiuda i bracci per favore !!!!!!!!!!!!!!!!!1
-				 */
-				reporter.armingCheckFailure(
-					NavModes::All,
-					health_component_t::system,
-					events::ID("check_arms_not_closed"),
-					events::Log::Error,
-					"Bracci non chiusi");
-
-				if (reporter.mavlink_log_pub()) {
-					mavlink_log_critical(reporter.mavlink_log_pub(),
-					                     "Preflight Fail: %s", msg);
-				}
-			}
+	auto append_arm = [&](int arm_idx) {
+		if (used < sizeof(open_arms)) {
+			used += snprintf(open_arms + used,
+			                 sizeof(open_arms) - used,
+			                 "%d ",
+			                 arm_idx);
 		}
+	};
+
+	bool any_open = false;
+
+	// Semantics: hallX == 0  -> arm NOT closed
+	if (arms.hall1 == 0) { append_arm(1); any_open = true; }
+	if (arms.hall2 == 0) { append_arm(2); any_open = true; }
+	if (arms.hall3 == 0) { append_arm(3); any_open = true; }
+	if (arms.hall4 == 0) { append_arm(4); any_open = true; }
+
+	if (!any_open) {
+		return;
+	}
+
+	// Remove trailing space
+	if (used > 0 && open_arms[used - 1] == ' ') {
+		open_arms[used - 1] = '\0';
+	}
+
+	/* EVENT
+	 * @description
+	 * Arms not closed
+	 */
+	reporter.armingCheckFailure(
+		NavModes::All,
+		health_component_t::system,
+		events::ID("check_arms_not_closed"),
+		events::Log::Error,
+		"Arms not closed");
+
+	// Detailed info (allowed to be dynamic)
+	if (reporter.mavlink_log_pub()) {
+		mavlink_log_critical(
+			reporter.mavlink_log_pub(),
+			"Preflight Fail: Arms not closed: %s",
+			open_arms);
 	}
 }

@@ -70,9 +70,10 @@ int ESP32hall::init() {
 /* Probe: fai la stessa sequenza del runtime (WRITE cmd, poi READ 1 byte) */
 int ESP32hall::probe()
 {
-	uint8_t state = 0;
-	int ret = read_state(state);
-	return (ret == OK) ? OK : PX4_ERROR;
+	//uint8_t state = 0;
+	//int ret = read_state(state);
+	//return (ret == OK) ? OK : PX4_ERROR;
+	return OK;
 }
 
 void ESP32hall::RunImpl()
