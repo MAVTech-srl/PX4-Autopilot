@@ -41,6 +41,8 @@
 #include <geo/geo.h>
 
 using namespace matrix;
+using namespace time_literals;
+
 
 bool FlightTaskManualAltitude::updateInitialize()
 {
@@ -198,7 +200,9 @@ void FlightTaskManualAltitude::_respectMinAltitude()
 
 void FlightTaskManualAltitude::_terrainFollowing(bool apply_brake, bool stopped)
 {
+    int branch = 0;
 	if (apply_brake && stopped && !PX4_ISFINITE(_dist_to_ground_lock)) {
+        branch = 1;
 		// User wants to break and vehicle reached zero velocity. Lock height to ground.
 
 		// lock position
@@ -209,6 +213,7 @@ void FlightTaskManualAltitude::_terrainFollowing(bool apply_brake, bool stopped)
 		_dist_to_ground_lock = _dist_to_bottom - (_position_setpoint(2) - _position(2));
 
 	} else if (apply_brake && PX4_ISFINITE(_dist_to_ground_lock)) {
+        branch = 2;
 		// vehicle needs to follow terrain
 
 		// difference between the current distance to ground and the desired distance to ground
@@ -217,9 +222,23 @@ void FlightTaskManualAltitude::_terrainFollowing(bool apply_brake, bool stopped)
 		_position_setpoint(2) = _position(2) - delta_distance_to_ground;
 
 	} else {
+        branch = 3;
 		// user demands velocity change in D-direction
 		_dist_to_ground_lock = _position_setpoint(2) = NAN;
 	}
+    static hrt_abstime last = 0;
+    const hrt_abstime now = hrt_absolute_time();
+    if (now - last > 2000_ms) { // 5 Hz
+        last = now;
+	PX4_INFO_RAW("TF OUT: vz_cmd=% .3f z_sp=% .3f z_curr=% .3f dist_to_ground_lock=% .3f stick_z=% .3f dist_bottom=% .3f branch=% .3f\n",
+			(double)_velocity_setpoint(2),
+			(double)_position_setpoint(2),
+			(double)_position(2),
+			(double) _dist_to_ground_lock,
+			(double)_sticks.getPositionExpo()(2),
+			(double)_dist_to_bottom,
+			(double) branch);
+    }
 }
 
 void FlightTaskManualAltitude::_respectMaxAltitude()
@@ -293,6 +312,15 @@ bool FlightTaskManualAltitude::update()
 	_updateConstraintsFromEstimator();
 	_scaleSticks();
 	_updateSetpoints();
+    static hrt_abstime last = 0;
+    const hrt_abstime now = hrt_absolute_time();
+    if (now - last > 2000_ms) { // 5 Hz
+        last = now;
+        PX4_INFO_RAW("ALT IN: vz_cmd=% .3f z_lock=% .3f stick_z=% .3f\n",
+                (double)_velocity_setpoint(2),
+                (double)_position_setpoint(2),
+                (double)_sticks.getPositionExpo()(2));
+    }
 	_constraints.want_takeoff = _checkTakeoff();
 	_max_distance_to_ground = INFINITY;
 

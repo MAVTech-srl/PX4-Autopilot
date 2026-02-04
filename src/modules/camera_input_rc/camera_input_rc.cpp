@@ -81,8 +81,7 @@ void CameraInputRC::run()
 			case 6: val = msp.aux6; break;
 			default: break;
 			}
-			// aux = indice aux selezionato
-			PX4_INFO("AUX%i value = %.2f (thr=%.2f)", aux, (double)val, (double)threshold);
+
 
 			// Stato attuale ON/OFF rispetto alla soglia
 			bool state = (val > threshold);

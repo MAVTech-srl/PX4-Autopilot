@@ -349,6 +349,20 @@ void FlightModeManager::generateTrajectorySetpoint(const float dt,
 	setpoint.timestamp = hrt_absolute_time();
 	_trajectory_setpoint_pub.publish(setpoint);
 
+	static hrt_abstime last = 0;
+	const hrt_abstime now = hrt_absolute_time();
+
+	if (now - last > 2000_ms) { // 5 Hz
+		last = now;
+		PX4_INFO_RAW("FMM: z=%.3f vz=%.3f az=%.3f yaw=%.2f\n",
+             (double)setpoint.position[2],
+             (double)setpoint.velocity[2],
+             (double)setpoint.acceleration[2],
+             (double)setpoint.yaw);
+
+
+	}
+
 	constraints.timestamp = hrt_absolute_time();
 	_vehicle_constraints_pub.publish(constraints);
 

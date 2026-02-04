@@ -40,6 +40,7 @@
 #include <float.h>
 
 using namespace matrix;
+using namespace time_literals;
 
 bool FlightTaskManualAltitudeSmoothVel::activate(const trajectory_setpoint_s &last_setpoint)
 {
@@ -83,6 +84,19 @@ void FlightTaskManualAltitudeSmoothVel::_updateSetpoints()
 	// Get yaw setpoint, un-smoothed position setpoints
 	FlightTaskManualAltitude::_updateSetpoints();
 
+	// ---- PRINT INPUT (pre-smoothing) ----
+    static hrt_abstime last = 0;
+    const hrt_abstime now = hrt_absolute_time();
+    if (now - last > 2000_ms) { // 5 Hz
+        last = now;
+        PX4_INFO_RAW("SMZ IN: z_sp=% .3f vz_cmd=% .3f fb_vz=% .3f up=%.2f dn=%.2f\n",
+                     (double)_position_setpoint(2),
+                     (double)_velocity_setpoint(2),
+                     (double)_velocity_setpoint_feedback(2),
+                     (double)_constraints.speed_up,
+                     (double)_constraints.speed_down);
+    }
+
 	_smoothing.update(_deltatime, _velocity_setpoint(2));
 
 	// Fill the jerk, acceleration, velocity and position setpoint vectors
@@ -107,14 +121,38 @@ void FlightTaskManualAltitudeSmoothVel::_setOutputState()
 	_acceleration_setpoint(2) = _smoothing.getCurrentAcceleration();
 	_velocity_setpoint(2) = _smoothing.getCurrentVelocity();
 
-	if (!_terrain_hold) {
-		if (_terrain_hold_previous) {
-			// Reset position setpoint to current position when switching from terrain hold to non-terrain hold
+	// Terrain following active: MPC_ALT_MODE==1 and dist_bottom available
+    const bool terrain_follow_active = (_param_mpc_alt_mode.get() == 1) && PX4_ISFINITE(_dist_to_bottom);
+
+    if (!_terrain_hold && !terrain_follow_active) {
+
+		const bool exited_terrain =
+			(_terrain_hold_previous) || (_terrain_follow_active_prev);
+
+		if (exited_terrain) {
+			// Resync smoother when exiting terrain-follow/terrain-hold to avoid z_sp jump
 			_smoothing.setCurrentPosition(_position(2));
 		}
 
 		_position_setpoint(2) = _smoothing.getCurrentPosition();
 	}
+	
+	static hrt_abstime last = 0;
+	const hrt_abstime now = hrt_absolute_time();
+
+	if (now - last > 2000_ms) { // 5 Hz
+		last = now;
+		PX4_INFO_RAW("SMZ: z=%.3f z2=%.3f vz=%.3f az=%.3f jz=%.3f th=%d\n",
+             (double)_smoothing.getCurrentPosition(),
+			 (double) _position_setpoint(2),
+             (double)_velocity_setpoint(2),
+             (double)_acceleration_setpoint(2),
+             (double)_jerk_setpoint(2),
+             (int)_terrain_hold);
+
+	}
+
 
 	_terrain_hold_previous = _terrain_hold;
+	_terrain_follow_active_prev = terrain_follow_active;
 }

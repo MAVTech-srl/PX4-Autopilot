@@ -102,6 +102,7 @@ private:
 	 * @param stopped is true if vehicle has stopped moving in D-direction
 	 */
 	void _terrainFollowing(bool apply_brake, bool stopped);
+	uint32_t _seq_dbg{0};
 
 	/**
 	 * Minimum Altitude during range sensor operation.
