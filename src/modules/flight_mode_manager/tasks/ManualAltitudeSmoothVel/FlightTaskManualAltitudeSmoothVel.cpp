@@ -107,14 +107,22 @@ void FlightTaskManualAltitudeSmoothVel::_setOutputState()
 	_acceleration_setpoint(2) = _smoothing.getCurrentAcceleration();
 	_velocity_setpoint(2) = _smoothing.getCurrentVelocity();
 
-	if (!_terrain_hold) {
-		if (_terrain_hold_previous) {
-			// Reset position setpoint to current position when switching from terrain hold to non-terrain hold
-			_smoothing.setCurrentPosition(_position(2));
+	// Terrain following active: MPC_ALT_MODE==1 and dist_bottom available
+	const bool terrain_follow_active = (_param_mpc_alt_mode.get() == 1) && PX4_ISFINITE(_dist_to_bottom);
+
+	if (!_terrain_hold && !terrain_follow_active) {
+
+			const bool exited_terrain =
+				(_terrain_hold_previous) || (_terrain_follow_active_prev);
+
+			if (exited_terrain) {
+				// Resync smoother when exiting terrain-follow/terrain-hold to avoid z_sp jump
+				_smoothing.setCurrentPosition(_position(2));
+			}
+
+			_position_setpoint(2) = _smoothing.getCurrentPosition();
 		}
 
-		_position_setpoint(2) = _smoothing.getCurrentPosition();
-	}
-
 	_terrain_hold_previous = _terrain_hold;
+	_terrain_follow_active_prev = terrain_follow_active;
 }
