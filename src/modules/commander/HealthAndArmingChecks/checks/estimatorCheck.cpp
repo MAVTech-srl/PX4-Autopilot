@@ -328,7 +328,7 @@ void EstimatorChecks::checkEstimatorStatus(const Context &context, Report &repor
 							    log_level, "Not enough GPS Satellites");
 
 			} else if (estimator_status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_PDOP)) {
-				message = "Preflight%s: GPS PDOP too high";
+				message = "Preflight%s: GPS is still settling";
 				/* EVENT
 				 * @description
 				 * <profile name="dev">
@@ -340,7 +340,7 @@ void EstimatorChecks::checkEstimatorStatus(const Context &context, Report &repor
 							    log_level, "GPS PDOP too high");
 
 			} else if (estimator_status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_HORZ_ERR)) {
-				message = "Preflight%s: GPS Horizontal Pos Error too high";
+				message = "Preflight%s: GPS is still settling";
 				/* EVENT
 				 * @description
 				 * <profile name="dev">
@@ -352,7 +352,7 @@ void EstimatorChecks::checkEstimatorStatus(const Context &context, Report &repor
 							    log_level, "GPS Horizontal Position Error too high");
 
 			} else if (estimator_status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_VERT_ERR)) {
-				message = "Preflight%s: GPS Vertical Pos Error too high";
+				message = "Preflight%s: GPS is still settling";
 				/* EVENT
 				 * @description
 				 * <profile name="dev">
@@ -376,7 +376,7 @@ void EstimatorChecks::checkEstimatorStatus(const Context &context, Report &repor
 							    log_level, "GPS Speed Accuracy too low");
 
 			} else if (estimator_status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_HORZ_DRIFT)) {
-				message = "Preflight%s: GPS Horizontal Pos Drift too high";
+				message = "Preflight%s: GPS is still settling";
 				/* EVENT
 				 * @description
 				 * <profile name="dev">
@@ -388,7 +388,7 @@ void EstimatorChecks::checkEstimatorStatus(const Context &context, Report &repor
 							    log_level, "GPS Horizontal Position Drift too high");
 
 			} else if (estimator_status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_VERT_DRIFT)) {
-				message = "Preflight%s: GPS Vertical Pos Drift too high";
+				message = "Preflight%s: GPS is still settling";
 				/* EVENT
 				 * @description
 				 * <profile name="dev">
@@ -400,7 +400,7 @@ void EstimatorChecks::checkEstimatorStatus(const Context &context, Report &repor
 							    log_level, "GPS Vertical Position Drift too high");
 
 			} else if (estimator_status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_HORZ_SPD_ERR)) {
-				message = "Preflight%s: GPS Hor Speed Drift too high";
+				message = "Preflight%s: GPS is still settling";
 				/* EVENT
 				 * @description
 				 * <profile name="dev">
@@ -412,7 +412,7 @@ void EstimatorChecks::checkEstimatorStatus(const Context &context, Report &repor
 							    log_level, "GPS Horizontal Speed Drift too high");
 
 			} else if (estimator_status.gps_check_fail_flags & (1 << estimator_status_s::GPS_CHECK_FAIL_MAX_VERT_SPD_ERR)) {
-				message = "Preflight%s: GPS Vert Speed Drift too high";
+				message = "Preflight%s: GPS is still settling";
 				/* EVENT
 				 * @description
 				 * <profile name="dev">
