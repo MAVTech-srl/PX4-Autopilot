@@ -56,6 +56,8 @@
 #include <gz/math/Rand.hh>
 #include <gz/math/Pose3.hh>
 
+#include <cmath>
+
 using namespace std::chrono_literals;
 
 namespace custom
@@ -113,6 +115,24 @@ private:
 	gz::math::Quaterniond _orientation_sp{1., 0., 0., 0.};
 	// Height setpoint [m]
 	double _platform_height_setpoint{2.};
+	// Sinusoidal heave (vertical bob) added on top of the height setpoint,
+	// to emulate a boat/ship riding waves. Amplitude 0 (default) = disabled,
+	// matching prior behaviour when the env vars below are unset.
+	double _heave_amplitude{0.};   // [m]
+	double _heave_period{6.};      // [s]
+	// Current simulation time, refreshed every PreUpdate, used to phase the heave.
+	double _sim_time_sec{0.};
+	// Scales the random-noise wrench (waves/road noise jitter) applied every
+	// step. 0 (default) disables it; 1.0 matches the original always-on jitter.
+	double _noise_amplitude{0.};
+
+	// How long (sim seconds) to keep the platform stationary after the
+	// vehicle has spawned, so there's time to arm/take off with a stable
+	// GPS fix before the platform starts moving. 0 (default) = original
+	// behaviour: starts moving as soon as the vehicle spawns.
+	double _start_delay_sec{0.};
+	// Sim time at which the vehicle was first seen spawned; -1 = not yet.
+	double _vehicle_spawn_sim_time{-1.};
 
 	double _gravity{-9.8};
 	double _platform_mass{10000.};

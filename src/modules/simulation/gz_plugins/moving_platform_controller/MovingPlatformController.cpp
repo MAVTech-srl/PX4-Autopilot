@@ -95,6 +95,18 @@ void MovingPlatformController::Configure(const gz::sim::Entity &entity,
 		// Velocity setpoint in world frame.
 		const gz::math::Vector3d _body_velocity_sp(vel_forward, 0., 0.);
 		_velocity_sp = _orientation_sp * _body_velocity_sp;
+
+		_heave_amplitude = readEnvVar("PX4_GZ_PLATFORM_HEAVE_AMPL", 0.0);
+		_heave_period = readEnvVar("PX4_GZ_PLATFORM_HEAVE_PERIOD", 6.0);
+
+		if (_heave_period <= 0.0 && std::fabs(_heave_amplitude) > 0.0) {
+			gzwarn << "PX4_GZ_PLATFORM_HEAVE_PERIOD must be > 0, disabling heave." << std::endl;
+			_heave_amplitude = 0.0;
+		}
+
+		_noise_amplitude = readEnvVar("PX4_GZ_PLATFORM_NOISE_AMPL", 0.0);
+
+		_start_delay_sec = readEnvVar("PX4_GZ_PLATFORM_START_DELAY", 0.0);
 	}
 
 	// Get gravity, model mass, platform height.
@@ -136,13 +148,25 @@ void MovingPlatformController::PreUpdate(const gz::sim::UpdateInfo &_info, gz::s
 {
 	getPlatformState(ecm);
 
+	_sim_time_sec = std::chrono::duration<double>(_info.simTime).count();
+
 	const double dt_sec = std::chrono::duration<double>(_info.dt).count();
 	updateNoise(dt_sec);
 
 	// Keep stationary if model is not yet spawned (and model name valid).
 	// If model name invalid, then we don't know what to wait for and move it immediately.
 	const bool vehicle_has_spawned = 0 != _world.ModelByName(ecm, _vehicle_model_name);
-	const bool keep_stationary = _wait_for_vehicle_spawned && !vehicle_has_spawned;
+
+	if (vehicle_has_spawned && _vehicle_spawn_sim_time < 0.) {
+		_vehicle_spawn_sim_time = _sim_time_sec;
+	}
+
+	// Once spawned, additionally hold still for _start_delay_sec (PX4_GZ_PLATFORM_START_DELAY)
+	// so there's time to arm and take off with a stable GPS fix.
+	const bool still_in_start_delay = vehicle_has_spawned
+					   && (_sim_time_sec - _vehicle_spawn_sim_time) < _start_delay_sec;
+
+	const bool keep_stationary = (_wait_for_vehicle_spawned && !vehicle_has_spawned) || still_in_start_delay;
 
 	updateWrenchCommand(_velocity_sp, _orientation_sp, keep_stationary);
 
@@ -205,10 +229,11 @@ void MovingPlatformController::updateWrenchCommand(
 
 	// Noise amplitude >= 0
 	// larger number = bigger movement
-	const double noise_ampl_force_scaling = keep_stationary ? 0. : 1.;          // [N / kg]
+	// Scaled by _noise_amplitude (PX4_GZ_PLATFORM_NOISE_AMPL, default 0).
+	const double noise_ampl_force_scaling = keep_stationary ? 0. : _noise_amplitude;          // [N / kg]
 	const double noise_ampl_force = noise_ampl_force_scaling * _platform_mass;  // [N]
 
-	const double noise_ampl_torque_scaling = keep_stationary ? 0. : 1.;         // [N m / (kg m^2) = 1/s^2]
+	const double noise_ampl_torque_scaling = keep_stationary ? 0. : _noise_amplitude;         // [N m / (kg m^2) = 1/s^2]
 	const gz::math::Vector3d noise_ampl_torque = noise_ampl_torque_scaling * _platform_diag_moments; // [N m]
 
 	const gz::math::Vector3d normal_force(0., 0., -_gravity * _platform_mass);  // [N]
@@ -224,8 +249,22 @@ void MovingPlatformController::updateWrenchCommand(
 		const gz::math::Vector3d pos_gains = _platform_mass * gz::math::Vector3d(0., 0., 1.); // [N / m]
 		const gz::math::Vector3d vel_gains = _platform_mass * gz::math::Vector3d(1., 1., 1.); // [N / (m/s)]
 
-		const gz::math::Vector3d platform_position_setpoint(0., 0., _platform_height_setpoint);
-		const gz::math::Vector3d current_velocity_setpoint = keep_stationary ? gz::math::Vector3d::Zero : velocity_setpoint;
+		// Sinusoidal heave: feed forward both the position offset and its
+		// derivative (velocity) so the PD tracks the wave cleanly instead of
+		// lagging behind a moving position-only setpoint.
+		double heave_pos = 0.;
+		double heave_vel = 0.;
+
+		if (std::fabs(_heave_amplitude) > 0.) {
+			const double omega = 2. * GZ_PI / _heave_period;
+			heave_pos = _heave_amplitude * std::sin(omega * _sim_time_sec);
+			heave_vel = _heave_amplitude * omega * std::cos(omega * _sim_time_sec);
+		}
+
+		const gz::math::Vector3d platform_position_setpoint(0., 0., _platform_height_setpoint + heave_pos);
+		const gz::math::Vector3d current_velocity_setpoint = keep_stationary
+				? gz::math::Vector3d::Zero
+				: velocity_setpoint + gz::math::Vector3d(0., 0., heave_vel);
 
 		const gz::math::Vector3d platform_pos_error = (_platform_position - platform_position_setpoint);
 		const gz::math::Vector3d platform_vel_error = (_platform_velocity - current_velocity_setpoint);

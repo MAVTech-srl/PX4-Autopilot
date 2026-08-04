@@ -23,6 +23,24 @@ The velocity (in m/s) can be set with the `PX4_GZ_PLATFORM_VEL` and `PX4_GZ_PLAT
 PX4_GZ_PLATFORM_VEL=5 PX4_GZ_PLATFORM_HEADING_DEG=135 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
 ```
 
+A sinusoidal vertical bob (heave) can be added on top of the height setpoint with `PX4_GZ_PLATFORM_HEAVE_AMPL` (amplitude in m, default 0 = disabled) and `PX4_GZ_PLATFORM_HEAVE_PERIOD` (period in s, default 6). Both position and velocity of the wave are fed forward, so the platform tracks it cleanly instead of lagging behind.
+
+```
+PX4_GZ_PLATFORM_HEAVE_AMPL=0.3 PX4_GZ_PLATFORM_HEAVE_PERIOD=6 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
+```
+
+The platform also carries a low-pass filtered random-noise wrench (waves/road noise jitter, applied every step regardless of heave), scaled with `PX4_GZ_PLATFORM_NOISE_AMPL` (default **0 = disabled**; set to `1.0` to restore the original always-on jitter).
+
+```
+PX4_GZ_PLATFORM_NOISE_AMPL=1 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
+```
+
+If the vehicle spawns directly on the platform, it starts moving as soon as the vehicle model appears in the world -- generally well before you can complete pre-arm checks and arm, so GPS/position keeps drifting while disarmed and the vehicle refuses to take off. `PX4_GZ_PLATFORM_START_DELAY` (seconds, default 0 = original behaviour) keeps the platform stationary for that long *after* the vehicle spawns, giving you time to arm and take off with a stable fix before it starts moving.
+
+```
+PX4_GZ_PLATFORM_START_DELAY=20 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
+```
+
 To use the plugin with a *different* world or model, add the following to the model.sdf:
 
 ```
