@@ -83,6 +83,9 @@ publications:
   - topic: /fmu/out/obstacle_distance_fused
     type: px4_msgs::msg::ObstacleDistance
 
+  - topic: /fmu/out/prec_land_status
+    type: px4_msgs::msg::PrecLandStatus
+
 # Create uORB::Publication
 subscriptions:
   - topic: /fmu/in/register_ext_component_request

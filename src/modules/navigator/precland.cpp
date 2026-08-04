@@ -161,6 +161,7 @@ PrecLand::on_active()
 		break;
 	}
 
+	publish_status();
 }
 
 void
@@ -453,6 +454,37 @@ PrecLand::switch_to_state_done()
 void PrecLand::print_state_switch_message(const char *state_name)
 {
 	PX4_INFO("Precland: switching to %s", state_name);
+}
+
+void PrecLand::publish_status()
+{
+	uint8_t state = prec_land_status_s::STATE_START;
+
+	switch (_state) {
+	case PrecLandState::Start:              state = prec_land_status_s::STATE_START; break;
+
+	case PrecLandState::HorizontalApproach: state = prec_land_status_s::STATE_HORIZONTAL_APPROACH; break;
+
+	case PrecLandState::DescendAboveTarget: state = prec_land_status_s::STATE_DESCEND_ABOVE_TARGET; break;
+
+	case PrecLandState::FinalApproach:      state = prec_land_status_s::STATE_FINAL_APPROACH; break;
+
+	case PrecLandState::Search:             state = prec_land_status_s::STATE_SEARCH; break;
+
+	case PrecLandState::Fallback:           state = prec_land_status_s::STATE_FALLBACK; break;
+
+	case PrecLandState::Done:               state = prec_land_status_s::STATE_DONE; break;
+	}
+
+	prec_land_status_s status{};
+	status.timestamp = hrt_absolute_time();
+	status.state = state;
+	status.mode = (_mode == PrecLandMode::Required)
+		      ? prec_land_status_s::MODE_REQUIRED
+		      : prec_land_status_s::MODE_OPPORTUNISTIC;
+	status.target_pose_valid = _target_pose_valid;
+	status.search_count = _search_cnt;
+	_precland_status_pub.publish(status);
 }
 
 bool PrecLand::check_state_conditions(PrecLandState state)
