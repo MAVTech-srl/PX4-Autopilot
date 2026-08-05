@@ -114,11 +114,13 @@ void SensorGpsSim::Run()
 		vehicle_global_position_s gpos{};
 		_vehicle_global_position_sub.copy(&gpos);
 
-		double latitude = gpos.lat + math::degrees((double)generate_wgn() * 0.2 / CONSTANTS_RADIUS_OF_EARTH);
-		double longitude = gpos.lon + math::degrees((double)generate_wgn() * 0.2 / CONSTANTS_RADIUS_OF_EARTH);
-		double altitude = (double)(gpos.alt + (generate_wgn() * 0.5f));
+		// RTK-fixed-like accuracy (~cm-level) instead of standard-GPS noise
+		// (was 0.2/0.2/0.5m position, 0.06/0.077/0.158 m/s velocity).
+		double latitude = gpos.lat + math::degrees((double)generate_wgn() * 0.02 / CONSTANTS_RADIUS_OF_EARTH);
+		double longitude = gpos.lon + math::degrees((double)generate_wgn() * 0.02 / CONSTANTS_RADIUS_OF_EARTH);
+		double altitude = (double)(gpos.alt + (generate_wgn() * 0.03f));
 
-		Vector3f gps_vel = Vector3f{lpos.vx, lpos.vy, lpos.vz} + noiseGauss3f(0.06f, 0.077f, 0.158f);
+		Vector3f gps_vel = Vector3f{lpos.vx, lpos.vy, lpos.vz} + noiseGauss3f(0.02f, 0.02f, 0.03f);
 
 		// device id
 		device::Device::DeviceId device_id;
@@ -130,14 +132,15 @@ void SensorGpsSim::Run()
 		sensor_gps_s sensor_gps{};
 
 		if (_sim_gps_used.get() >= 4) {
-			// fix
-			sensor_gps.fix_type = 3; // 3D fix
-			sensor_gps.s_variance_m_s = 0.4f;
-			sensor_gps.c_variance_rad = 0.1f;
-			sensor_gps.eph = 0.9f;
-			sensor_gps.epv = 1.78f;
-			sensor_gps.hdop = 0.7f;
-			sensor_gps.vdop = 1.1f;
+			// fix -- RTK fixed, matching the cm-level noise injected above
+			// (was FIX_TYPE_3D / 0.4 / 0.1 / 0.9 / 1.78 / 0.7).
+			sensor_gps.fix_type = sensor_gps_s::FIX_TYPE_RTK_FIXED;
+			sensor_gps.s_variance_m_s = 0.05f;
+			sensor_gps.c_variance_rad = 0.05f;
+			sensor_gps.eph = 0.02f;
+			sensor_gps.epv = 0.03f;
+			sensor_gps.hdop = 0.5f;
+			sensor_gps.vdop = 0.7f;
 
 		} else {
 			// no fix
