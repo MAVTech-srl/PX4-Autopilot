@@ -109,6 +109,15 @@ void MovingPlatformController::Configure(const gz::sim::Entity &entity,
 		_start_delay_sec = readEnvVar("PX4_GZ_PLATFORM_START_DELAY", 0.0);
 
 		_travel_distance = readEnvVar("PX4_GZ_PLATFORM_TRAVEL_DISTANCE", 0.0);
+
+		_wait_for_trigger = readEnvVar("PX4_GZ_PLATFORM_WAIT_FOR_TRIGGER", 0.0) > 0.5;
+
+		if (_wait_for_trigger) {
+			_trigger_topic = "/model/" + _model.Name(ecm) + "/start_motion";
+			_transport_node.Subscribe(_trigger_topic, &MovingPlatformController::onStartTrigger, this);
+			gzmsg << "MovingPlatformController: holding stationary until a message is "
+			      << "published on " << _trigger_topic << std::endl;
+		}
 	}
 
 	// Get gravity, model mass, platform height.
@@ -168,7 +177,10 @@ void MovingPlatformController::PreUpdate(const gz::sim::UpdateInfo &_info, gz::s
 	const bool still_in_start_delay = vehicle_has_spawned
 					   && (_sim_time_sec - _vehicle_spawn_sim_time) < _start_delay_sec;
 
-	const bool keep_stationary = (_wait_for_vehicle_spawned && !vehicle_has_spawned) || still_in_start_delay;
+	const bool waiting_for_trigger = _wait_for_trigger && !_trigger_received;
+
+	const bool keep_stationary = (_wait_for_vehicle_spawned && !vehicle_has_spawned)
+				      || still_in_start_delay || waiting_for_trigger;
 
 	// Once actually moving (not held stationary), remember where from, so we
 	// can measure how far it's travelled since.
@@ -453,4 +465,13 @@ void MovingPlatformController::getVehicleModelName()
 
 	_vehicle_model_name = px4_sim_model + "_" + px4_instance;
 	_wait_for_vehicle_spawned = true;
+}
+
+void MovingPlatformController::onStartTrigger(const gz::msgs::Empty &)
+{
+	if (!_trigger_received) {
+		gzmsg << "MovingPlatformController: start trigger received on " << _trigger_topic << std::endl;
+	}
+
+	_trigger_received = true;
 }

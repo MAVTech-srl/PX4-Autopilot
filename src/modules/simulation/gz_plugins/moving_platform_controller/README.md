@@ -47,6 +47,20 @@ For a controlled "moves a bit, then stops" test instead of moving forever, set `
 PX4_GZ_PLATFORM_TRAVEL_DISTANCE=5 PX4_GZ_PLATFORM_VEL=1 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
 ```
 
+For manual control instead of a timer, set `PX4_GZ_PLATFORM_WAIT_FOR_TRIGGER=1` (default 0/off) -- the platform stays stationary indefinitely (ignoring `PX4_GZ_PLATFORM_START_DELAY`) until you publish a message on `/model/<model_name>/start_motion`.
+
+```
+PX4_GZ_PLATFORM_WAIT_FOR_TRIGGER=1 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
+```
+
+Then, whenever you want it to start moving:
+
+```
+gz topic -t /model/moving_platform_aruco/start_motion -m gz.msgs.Empty -p ""
+```
+
+(replace `moving_platform_aruco` with the actual model name if different -- the plugin logs the exact topic it's waiting on at startup)
+
 To use the plugin with a *different* world or model, add the following to the model.sdf:
 
 ```

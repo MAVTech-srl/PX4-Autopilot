@@ -49,8 +49,11 @@
 
 #include <gz/plugin/Register.hh>
 
+#include <gz/transport/Node.hh>
+
 #include <gz/msgs/Utility.hh>
 #include <gz/msgs/twist.pb.h>
+#include <gz/msgs/empty.pb.h>
 
 #include <gz/math.hh>
 #include <gz/math/Rand.hh>
@@ -86,6 +89,7 @@ private:
 	void sendWrenchCommand(gz::sim::EntityComponentManager &ecm);
 	double readEnvVar(const char *env_var_name, double default_value);
 	void getVehicleModelName();
+	void onStartTrigger(const gz::msgs::Empty &msg);
 
 	gz::sim::Entity _entity;
 	gz::sim::Model _model{gz::sim::kNullEntity};
@@ -141,6 +145,16 @@ private:
 	gz::math::Vector3d _motion_start_position{0., 0., 0.};
 	bool _motion_started{false};
 	bool _travel_limit_reached{false};
+
+	// If true (PX4_GZ_PLATFORM_WAIT_FOR_TRIGGER), the platform stays
+	// stationary indefinitely -- ignoring PX4_GZ_PLATFORM_START_DELAY --
+	// until an gz.msgs.Empty message is received on _trigger_topic. Publish
+	// one manually to start motion on demand, e.g.:
+	//   gz topic -t /model/<name>/start_motion -m gz.msgs.Empty -p ""
+	bool _wait_for_trigger{false};
+	bool _trigger_received{false};
+	std::string _trigger_topic;
+	gz::transport::Node _transport_node;
 
 	double _gravity{-9.8};
 	double _platform_mass{10000.};
