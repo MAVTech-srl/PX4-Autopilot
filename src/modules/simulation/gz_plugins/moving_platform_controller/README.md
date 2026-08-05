@@ -41,6 +41,12 @@ If the vehicle spawns directly on the platform, it starts moving as soon as the 
 PX4_GZ_PLATFORM_START_DELAY=20 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
 ```
 
+For a controlled "moves a bit, then stops" test instead of moving forever, set `PX4_GZ_PLATFORM_TRAVEL_DISTANCE` (metres, default 0 = moves forever). The platform stops for good once it has covered that horizontal distance from wherever it was when it started moving (i.e. after any `PX4_GZ_PLATFORM_START_DELAY` has elapsed).
+
+```
+PX4_GZ_PLATFORM_TRAVEL_DISTANCE=5 PX4_GZ_PLATFORM_VEL=1 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
+```
+
 To use the plugin with a *different* world or model, add the following to the model.sdf:
 
 ```

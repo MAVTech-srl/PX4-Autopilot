@@ -134,6 +134,14 @@ private:
 	// Sim time at which the vehicle was first seen spawned; -1 = not yet.
 	double _vehicle_spawn_sim_time{-1.};
 
+	// If > 0 (PX4_GZ_PLATFORM_TRAVEL_DISTANCE), the platform stops for good
+	// once it has moved this many horizontal metres from where it was when
+	// it started moving. 0 (default) = original behaviour: moves forever.
+	double _travel_distance{0.};
+	gz::math::Vector3d _motion_start_position{0., 0., 0.};
+	bool _motion_started{false};
+	bool _travel_limit_reached{false};
+
 	double _gravity{-9.8};
 	double _platform_mass{10000.};
 	gz::math::Vector3d _platform_diag_moments;

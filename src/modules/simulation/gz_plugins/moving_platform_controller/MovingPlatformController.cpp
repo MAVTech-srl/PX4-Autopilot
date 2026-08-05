@@ -107,6 +107,8 @@ void MovingPlatformController::Configure(const gz::sim::Entity &entity,
 		_noise_amplitude = readEnvVar("PX4_GZ_PLATFORM_NOISE_AMPL", 0.0);
 
 		_start_delay_sec = readEnvVar("PX4_GZ_PLATFORM_START_DELAY", 0.0);
+
+		_travel_distance = readEnvVar("PX4_GZ_PLATFORM_TRAVEL_DISTANCE", 0.0);
 	}
 
 	// Get gravity, model mass, platform height.
@@ -167,6 +169,26 @@ void MovingPlatformController::PreUpdate(const gz::sim::UpdateInfo &_info, gz::s
 					   && (_sim_time_sec - _vehicle_spawn_sim_time) < _start_delay_sec;
 
 	const bool keep_stationary = (_wait_for_vehicle_spawned && !vehicle_has_spawned) || still_in_start_delay;
+
+	// Once actually moving (not held stationary), remember where from, so we
+	// can measure how far it's travelled since.
+	if (!keep_stationary && !_motion_started) {
+		_motion_start_position = _platform_position;
+		_motion_started = true;
+	}
+
+	if (_travel_distance > 0. && _motion_started && !_travel_limit_reached) {
+		const gz::math::Vector2d traveled_xy(
+			_platform_position.X() - _motion_start_position.X(),
+			_platform_position.Y() - _motion_start_position.Y());
+
+		if (traveled_xy.Length() >= _travel_distance) {
+			_travel_limit_reached = true;
+			_velocity_sp = gz::math::Vector3d::Zero;
+			gzwarn << "MovingPlatformController: reached PX4_GZ_PLATFORM_TRAVEL_DISTANCE ("
+			       << _travel_distance << "m), stopping." << std::endl;
+		}
+	}
 
 	updateWrenchCommand(_velocity_sp, _orientation_sp, keep_stationary);
 
