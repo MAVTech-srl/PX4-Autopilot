@@ -172,10 +172,13 @@ private:
 	float _gps_vel_noise_n = 0.0f;
 	float _gps_vel_noise_e = 0.0f;
 	float _gps_vel_noise_d = 0.0f;
-	const float _pos_noise_amplitude = 0.8f;    // Position noise amplitude [m]
+	// RTK-fixed-like accuracy: was 0.8/0.05 [m]/[m/s], scaled down ~10x/5x so
+	// the steady-state noise (b^2/(1-a^2) of this AR(1) process) lands at
+	// ~cm-level instead of the original uncorrected-GPS-like noise.
+	const float _pos_noise_amplitude = 0.08f;   // Position noise amplitude [m]
 	const float _pos_random_walk = 0.01f;       // Position random walk coefficient
 	const float _pos_markov_time = 0.95f;       // Position Markov process coefficient
-	const float _vel_noise_amplitude = 0.05f;   // Velocity noise amplitude [m/s]
+	const float _vel_noise_amplitude = 0.01f;   // Velocity noise amplitude [m/s]
 	const float _vel_noise_density = 0.2f;      // Velocity noise process density
 	const float _vel_markov_time = 0.85f;       // Velocity Markov process coefficient
 

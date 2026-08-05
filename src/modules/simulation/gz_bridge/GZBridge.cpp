@@ -600,14 +600,15 @@ void GZBridge::navSatCallback(const gz::msgs::NavSat &msg)
 	sensor_gps_s sensor_gps{};
 
 	if (_sim_gps_used.get() >= 4) {
-		// fix
-		sensor_gps.fix_type = 3; // 3D fix
-		sensor_gps.s_variance_m_s = 0.4f;
-		sensor_gps.c_variance_rad = 0.1f;
-		sensor_gps.eph = 0.9f;
-		sensor_gps.epv = 1.78f;
-		sensor_gps.hdop = 0.7f;
-		sensor_gps.vdop = 1.1f;
+		// fix -- RTK fixed, matching the cm-level noise from addGpsNoise()
+		// (was FIX_TYPE_3D / 0.4 / 0.1 / 0.9 / 1.78 / 0.7 / 1.1).
+		sensor_gps.fix_type = sensor_gps_s::FIX_TYPE_RTK_FIXED;
+		sensor_gps.s_variance_m_s = 0.05f;
+		sensor_gps.c_variance_rad = 0.05f;
+		sensor_gps.eph = 0.02f;
+		sensor_gps.epv = 0.03f;
+		sensor_gps.hdop = 0.5f;
+		sensor_gps.vdop = 0.7f;
 
 	} else {
 		// no fix
