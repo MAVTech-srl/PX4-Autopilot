@@ -23,6 +23,9 @@ publications:
   - topic: /fmu/out/estimator_status_flags
     type: px4_msgs::msg::EstimatorStatusFlags
 
+  - topic: /fmu/out/estimator_status
+    type: px4_msgs::msg::EstimatorStatus
+
   - topic: /fmu/out/failsafe_flags
     type: px4_msgs::msg::FailsafeFlags
 
