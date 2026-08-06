@@ -115,8 +115,22 @@ private:
 
 	// Platform velocity setpoint [m/s].
 	gz::math::Vector3d _velocity_sp{1., 0., 0.};
-	// Orientation setpoint.
+	// Orientation setpoint: fixed yaw only (PX4_GZ_PLATFORM_HEADING_DEG),
+	// set once in Configure and never touched again -- this is what
+	// _velocity_sp's direction is derived from, so it must stay yaw-only
+	// (a real boat's velocity doesn't tilt with its own roll/pitch).
+	// updateWrenchCommand layers the oscillating roll/pitch below on top
+	// of *this* separately, only for the attitude feedback torque target.
 	gz::math::Quaterniond _orientation_sp{1., 0., 0., 0.};
+	// Sinusoidal roll/pitch (rocking, about the platform's own fore-aft/
+	// lateral axes) layered on top of _orientation_sp for the attitude
+	// feedback target -- see updateWrenchCommand. Amplitudes in radians
+	// (converted from the *_DEG env vars at parse time); 0 (default) =
+	// disabled, platform stays level as before.
+	double _roll_amplitude{0.};    // [rad]
+	double _roll_period{6.};       // [s]
+	double _pitch_amplitude{0.};   // [rad]
+	double _pitch_period{6.};      // [s]
 	// Height setpoint [m]
 	double _platform_height_setpoint{2.};
 	// Sinusoidal heave (vertical bob) added on top of the height setpoint,
@@ -124,7 +138,22 @@ private:
 	// matching prior behaviour when the env vars below are unset.
 	double _heave_amplitude{0.};   // [m]
 	double _heave_period{6.};      // [s]
-	// Current simulation time, refreshed every PreUpdate, used to phase the heave.
+	// Sinusoidal lateral sway (side-to-side, perpendicular to heading) added
+	// on top of the velocity setpoint, to emulate a boat rocking side to
+	// side while under way. Amplitude 0 (default) = disabled. Unlike heave,
+	// only a velocity feed-forward is needed: the xy position gains below
+	// are zero, so a position feed-forward wouldn't affect the feedback
+	// force anyway.
+	double _sway_amplitude{0.};   // [m]
+	double _sway_period{6.};      // [s]
+	// Sinusoidal surge (fore-aft, along heading) added on top of the
+	// velocity setpoint, same idea as sway but on the other horizontal
+	// axis -- combined with sway this gives genuine 2D wave motion (not
+	// just side-to-side) superimposed on the constant heading velocity.
+	// Amplitude 0 (default) = disabled.
+	double _surge_amplitude{0.};   // [m]
+	double _surge_period{6.};      // [s]
+	// Current simulation time, refreshed every PreUpdate, used to phase the heave/sway/surge/roll/pitch.
 	double _sim_time_sec{0.};
 	// Scales the random-noise wrench (waves/road noise jitter) applied every
 	// step. 0 (default) disables it; 1.0 matches the original always-on jitter.

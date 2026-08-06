@@ -29,6 +29,24 @@ A sinusoidal vertical bob (heave) can be added on top of the height setpoint wit
 PX4_GZ_PLATFORM_HEAVE_AMPL=0.3 PX4_GZ_PLATFORM_HEAVE_PERIOD=6 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
 ```
 
+A sinusoidal lateral sway (side-to-side, perpendicular to the heading set by `PX4_GZ_PLATFORM_HEADING_DEG`) can be added the same way with `PX4_GZ_PLATFORM_SWAY_AMPL` (amplitude in m, default 0 = disabled) and `PX4_GZ_PLATFORM_SWAY_PERIOD` (period in s, default 6). Only a velocity feed-forward is applied (no position term, unlike heave) since the xy position gain is zero -- the platform still drifts along the constant travel velocity, with the sway riding on top. Orientation is untouched, so this does not tilt the platform.
+
+```
+PX4_GZ_PLATFORM_SWAY_AMPL=0.5 PX4_GZ_PLATFORM_SWAY_PERIOD=4 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
+```
+
+A matching sinusoidal surge (fore-aft, along the heading) can be added with `PX4_GZ_PLATFORM_SURGE_AMPL`/`PX4_GZ_PLATFORM_SURGE_PERIOD` -- same mechanism as sway, just the other horizontal axis. Combined with sway (ideally at a different period, so the two don't just trace a repeating ellipse) this gives the platform a genuine 2D wave wobble on top of its constant travel velocity. Also does not tilt the platform.
+
+```
+PX4_GZ_PLATFORM_SWAY_AMPL=0.5 PX4_GZ_PLATFORM_SWAY_PERIOD=4 PX4_GZ_PLATFORM_SURGE_AMPL=0.5 PX4_GZ_PLATFORM_SURGE_PERIOD=5 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
+```
+
+Actual tilting -- sinusoidal roll and pitch (rocking about the platform's own fore-aft/lateral axes, like a boat in waves) -- is separate from all of the above (which only ever move the platform's position, never its attitude): `PX4_GZ_PLATFORM_ROLL_AMPL_DEG`/`PX4_GZ_PLATFORM_ROLL_PERIOD` and `PX4_GZ_PLATFORM_PITCH_AMPL_DEG`/`PX4_GZ_PLATFORM_PITCH_PERIOD` (amplitude in degrees, period in s, both default 0/6 = disabled). Layered onto the fixed heading only for the attitude feedback target, so `PX4_GZ_PLATFORM_HEADING_DEG` and `_velocity_sp`'s direction stay yaw-only throughout.
+
+```
+PX4_GZ_PLATFORM_ROLL_AMPL_DEG=8 PX4_GZ_PLATFORM_ROLL_PERIOD=5 PX4_GZ_PLATFORM_PITCH_AMPL_DEG=4 PX4_GZ_PLATFORM_PITCH_PERIOD=7 PX4_GZ_MODEL_POSE=0,0,2.2,0,0,0 PX4_GZ_WORLD=moving_platform make px4_sitl gz_standard_vtol
+```
+
 The platform also carries a low-pass filtered random-noise wrench (waves/road noise jitter, applied every step regardless of heave), scaled with `PX4_GZ_PLATFORM_NOISE_AMPL` (default **0 = disabled**; set to `1.0` to restore the original always-on jitter).
 
 ```

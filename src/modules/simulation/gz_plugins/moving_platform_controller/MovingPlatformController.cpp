@@ -104,6 +104,38 @@ void MovingPlatformController::Configure(const gz::sim::Entity &entity,
 			_heave_amplitude = 0.0;
 		}
 
+		_sway_amplitude = readEnvVar("PX4_GZ_PLATFORM_SWAY_AMPL", 0.0);
+		_sway_period = readEnvVar("PX4_GZ_PLATFORM_SWAY_PERIOD", 6.0);
+
+		if (_sway_period <= 0.0 && std::fabs(_sway_amplitude) > 0.0) {
+			gzwarn << "PX4_GZ_PLATFORM_SWAY_PERIOD must be > 0, disabling sway." << std::endl;
+			_sway_amplitude = 0.0;
+		}
+
+		_surge_amplitude = readEnvVar("PX4_GZ_PLATFORM_SURGE_AMPL", 0.0);
+		_surge_period = readEnvVar("PX4_GZ_PLATFORM_SURGE_PERIOD", 6.0);
+
+		if (_surge_period <= 0.0 && std::fabs(_surge_amplitude) > 0.0) {
+			gzwarn << "PX4_GZ_PLATFORM_SURGE_PERIOD must be > 0, disabling surge." << std::endl;
+			_surge_amplitude = 0.0;
+		}
+
+		_roll_amplitude = GZ_DTOR(readEnvVar("PX4_GZ_PLATFORM_ROLL_AMPL_DEG", 0.0));
+		_roll_period = readEnvVar("PX4_GZ_PLATFORM_ROLL_PERIOD", 6.0);
+
+		if (_roll_period <= 0.0 && std::fabs(_roll_amplitude) > 0.0) {
+			gzwarn << "PX4_GZ_PLATFORM_ROLL_PERIOD must be > 0, disabling roll." << std::endl;
+			_roll_amplitude = 0.0;
+		}
+
+		_pitch_amplitude = GZ_DTOR(readEnvVar("PX4_GZ_PLATFORM_PITCH_AMPL_DEG", 0.0));
+		_pitch_period = readEnvVar("PX4_GZ_PLATFORM_PITCH_PERIOD", 6.0);
+
+		if (_pitch_period <= 0.0 && std::fabs(_pitch_amplitude) > 0.0) {
+			gzwarn << "PX4_GZ_PLATFORM_PITCH_PERIOD must be > 0, disabling pitch." << std::endl;
+			_pitch_amplitude = 0.0;
+		}
+
 		_noise_amplitude = readEnvVar("PX4_GZ_PLATFORM_NOISE_AMPL", 0.0);
 
 		_start_delay_sec = readEnvVar("PX4_GZ_PLATFORM_START_DELAY", 0.0);
@@ -289,16 +321,45 @@ void MovingPlatformController::updateWrenchCommand(
 		double heave_pos = 0.;
 		double heave_vel = 0.;
 
-		if (std::fabs(_heave_amplitude) > 0.) {
+		// Gated by !keep_stationary: unlike the xy velocity setpoint below,
+		// this position term has a nonzero gain (pos_gains.Z() == 1), so
+		// leaving it live during the start delay/trigger wait would bob the
+		// platform vertically well before it's supposed to move at all.
+		if (!keep_stationary && std::fabs(_heave_amplitude) > 0.) {
 			const double omega = 2. * GZ_PI / _heave_period;
 			heave_pos = _heave_amplitude * std::sin(omega * _sim_time_sec);
 			heave_vel = _heave_amplitude * omega * std::cos(omega * _sim_time_sec);
 		}
 
+		// Sinusoidal sway: velocity-only feed-forward (see header comment --
+		// xy position gain is zero below, so a position term would be a
+		// no-op), applied along the lateral direction relative to heading
+		// rather than fixed world axes, so it reads as the platform rocking
+		// side to side while under way instead of an odd diagonal drift.
+		gz::math::Vector3d sway_vel(0., 0., 0.);
+
+		if (std::fabs(_sway_amplitude) > 0.) {
+			const double sway_omega = 2. * GZ_PI / _sway_period;
+			const double sway_speed_lateral = _sway_amplitude * sway_omega * std::cos(sway_omega * _sim_time_sec);
+			sway_vel = orientation_setpoint * gz::math::Vector3d(0., sway_speed_lateral, 0.);
+		}
+
+		// Sinusoidal surge: same idea as sway, but fore-aft (along heading)
+		// instead of lateral -- together they give the platform a genuine
+		// 2D wave wobble on top of its constant heading velocity, instead
+		// of only ever drifting side to side.
+		gz::math::Vector3d surge_vel(0., 0., 0.);
+
+		if (std::fabs(_surge_amplitude) > 0.) {
+			const double surge_omega = 2. * GZ_PI / _surge_period;
+			const double surge_speed_fore_aft = _surge_amplitude * surge_omega * std::cos(surge_omega * _sim_time_sec);
+			surge_vel = orientation_setpoint * gz::math::Vector3d(surge_speed_fore_aft, 0., 0.);
+		}
+
 		const gz::math::Vector3d platform_position_setpoint(0., 0., _platform_height_setpoint + heave_pos);
 		const gz::math::Vector3d current_velocity_setpoint = keep_stationary
 				? gz::math::Vector3d::Zero
-				: velocity_setpoint + gz::math::Vector3d(0., 0., heave_vel);
+				: velocity_setpoint + gz::math::Vector3d(0., 0., heave_vel) + sway_vel + surge_vel;
 
 		const gz::math::Vector3d platform_pos_error = (_platform_position - platform_position_setpoint);
 		const gz::math::Vector3d platform_vel_error = (_platform_velocity - current_velocity_setpoint);
@@ -326,7 +387,31 @@ void MovingPlatformController::updateWrenchCommand(
 		//  - Eq. 20 in Full Quaternion Based Attitude Control for a Quadrotor (Fresk, Nikolakopoulos)
 		//    https://www.diva-portal.org/smash/get/diva2:1010947/FULLTEXT01.pdf
 
-		const gz::math::Quaterniond attitude_err = _platform_orientation * orientation_setpoint.Inverse();
+		// Sinusoidal roll/pitch (rocking): layered on top of the fixed-yaw
+		// orientation_setpoint *only* here, for the attitude feedback
+		// target -- not on _orientation_sp itself, which _velocity_sp's
+		// direction is derived from and must stay yaw-only. Gated by
+		// !keep_stationary same as heave, so the platform stays level
+		// while held still before the start delay/trigger.
+		double roll_angle = 0.;
+		double pitch_angle = 0.;
+
+		if (!keep_stationary) {
+			if (std::fabs(_roll_amplitude) > 0.) {
+				const double roll_omega = 2. * GZ_PI / _roll_period;
+				roll_angle = _roll_amplitude * std::sin(roll_omega * _sim_time_sec);
+			}
+
+			if (std::fabs(_pitch_amplitude) > 0.) {
+				const double pitch_omega = 2. * GZ_PI / _pitch_period;
+				pitch_angle = _pitch_amplitude * std::sin(pitch_omega * _sim_time_sec);
+			}
+		}
+
+		const gz::math::Quaterniond tilted_orientation_setpoint =
+			orientation_setpoint * gz::math::Quaterniond(roll_angle, pitch_angle, 0.);
+
+		const gz::math::Quaterniond attitude_err = _platform_orientation * tilted_orientation_setpoint.Inverse();
 
 		// With the factors of 1. having units of 1 / (m rad) and s / (m rad), respectively
 		const gz::math::Vector3d attitude_p_gain = 1. * _platform_diag_moments; // [N m / rad]
