@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# @name Gazebo x500 stereo camera and MID-360
+#
+# @type Quadrotor
+#
+
+PX4_SIM_MODEL=${PX4_SIM_MODEL:=x500_stereo_cam}
+
+. ${R}etc/init.d-posix/airframes/4001_gz_x500
