@@ -1,0 +1,328 @@
+#
+# PX4 NuttX + Simulation development environment
+#
+# Ubuntu 22.04 Jammy
+# PX4 base tools + NuttX firmware build + Gazebo Harmonic SITL simulation
+#
+
+FROM ubuntu:22.04
+
+LABEL maintainer="Davide Bitetto <davidebit95@gmail.com>"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV TERM=xterm
+ENV TZ=UTC
+
+#
+# Base PX4 development environment
+#
+
+RUN apt-get update && apt-get -y --quiet --no-install-recommends install \
+    ant \
+    binutils \
+    binutils-dev \
+    bc \
+    ca-certificates \
+    ccache \
+    cmake \
+    cppcheck \
+    curl \
+    dirmngr \
+    doxygen \
+    g++-multilib \
+    gcc-multilib \
+    gdb \
+    gettext \
+    git \
+    gnupg \
+    gosu \
+    lcov \
+    libelf-dev \
+    libexpat-dev \
+    libvecmath-java \
+    libfreetype6-dev \
+    libgmp-dev \
+    libgtest-dev \
+    libisl-dev \
+    libmpc-dev \
+    libmpfr-dev \
+    libpng-dev \
+    libssl-dev \
+    lsb-release \
+    make \
+    ninja-build \
+    openssh-client \
+    openjdk-11-jre \
+    openjdk-11-jdk \
+    python3 \
+    python3-dev \
+    python3-pip \
+    python3-venv \
+    rsync \
+    screen \
+    shellcheck \
+    tzdata \
+    texinfo \
+    u-boot-tools \
+    util-linux \
+    unzip \
+    valgrind \
+    wget \
+    xsltproc \
+    zip \
+    && apt-get -y autoremove \
+    && apt-get clean autoclean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+#
+# Set Java 11 as default
+#
+
+RUN update-alternatives --set java "$(update-alternatives --list java | grep 'java-11')"
+
+#
+# Build and install gtest libraries
+#
+
+RUN cd /usr/src/gtest \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    && make -j"$(nproc)" \
+    && find . -name "*.a" -exec cp {} /usr/lib \; \
+    && cd .. \
+    && rm -rf build
+
+#
+# Python tooling and PX4 Python dependencies
+#
+
+RUN python3 -m pip install --upgrade pip wheel setuptools
+
+RUN python3 -m pip install \
+    argparse \
+    argcomplete \
+    coverage \
+    cerberus \
+    empy==3.3.4 \
+    jinja2 \
+    kconfiglib \
+    "matplotlib>=3.0" \
+    numpy \
+    "nunavut>=1.1.0" \
+    packaging \
+    pkgconfig \
+    pyros-genmsg \
+    pyserial \
+    pyulog \
+    pyyaml \
+    requests \
+    six \
+    toml \
+    psutil \
+    jsonschema \
+    pynacl \
+    lxml
+
+#
+# Manual ccache setup
+#
+
+RUN ln -sf /usr/bin/ccache /usr/lib/ccache/cc \
+    && ln -sf /usr/bin/ccache /usr/lib/ccache/c++ \
+    && ln -sf /usr/bin/ccache /usr/lib/ccache/gcc \
+    && ln -sf /usr/bin/ccache /usr/lib/ccache/g++
+
+ENV CCACHE_UMASK=000
+ENV PATH="/usr/lib/ccache:${PATH}"
+
+#
+# astyle v3.1
+#
+
+RUN wget -q https://downloads.sourceforge.net/project/astyle/astyle/astyle%203.1/astyle_3.1_linux.tar.gz -O /tmp/astyle.tar.gz \
+    && cd /tmp \
+    && tar zxf astyle.tar.gz \
+    && cd astyle/src \
+    && make -f ../build/gcc/Makefile -j"$(nproc)" \
+    && cp bin/astyle /usr/local/bin \
+    && rm -rf /tmp/*
+
+#
+# Create default non-root user
+#
+
+RUN useradd --shell /bin/bash -u 1001 -c "" -m px4user \
+    && usermod -a -G dialout px4user
+
+#
+# Setup X11 socket directory
+#
+
+RUN mkdir -p /tmp/.X11-unix \
+    && chmod 1777 /tmp/.X11-unix \
+    && chown -R root:root /tmp/.X11-unix
+
+#
+# NuttX / PX4 firmware build dependencies
+#
+# Toolchain is installed from Ubuntu packages:
+# - gcc-arm-none-eabi
+# - libnewlib-arm-none-eabi
+# - libstdc++-arm-none-eabi-newlib
+# - gdb-multiarch
+#
+
+RUN apt-get update \
+    && apt-get -y --quiet --no-install-recommends install \
+        automake \
+        bison \
+        build-essential \
+        flex \
+        gcc-arm-none-eabi \
+        gdb-multiarch \
+        genromfs \
+        gperf \
+        kconfig-frontends \
+        libncurses-dev \
+        libncurses6 \
+        libncursesw6 \
+        libnewlib-arm-none-eabi \
+        libstdc++-arm-none-eabi-newlib \
+        libtool \
+        pkg-config \
+        vim-common \
+        usbutils \
+        udev \
+    && apt-get -y autoremove \
+    && apt-get clean autoclean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+#
+# ccache setup for ARM embedded toolchain
+#
+
+RUN ln -sf /usr/bin/ccache /usr/lib/ccache/arm-none-eabi-gcc \
+    && ln -sf /usr/bin/ccache /usr/lib/ccache/arm-none-eabi-g++ \
+    && ln -sf /usr/bin/ccache /usr/lib/ccache/arm-none-eabi-cpp
+
+#
+# bloaty
+#
+# Useful for firmware size analysis.
+#
+
+RUN git clone --recursive https://github.com/google/bloaty.git /tmp/bloaty \
+    && cd /tmp/bloaty \
+    && cmake -S . -B build -GNinja \
+    && ninja -C build -j"$(nproc)" bloaty \
+    && cp build/bloaty /usr/local/bin/ \
+    && rm -rf /tmp/*
+
+#
+# Gazebo Harmonic simulation dependencies
+#
+
+RUN wget -q https://packages.osrfoundation.org/gazebo.gpg \
+        -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] https://packages.osrfoundation.org/gazebo/ubuntu-stable jammy main" \
+        > /etc/apt/sources.list.d/gazebo-stable.list \
+    && apt-get update \
+    && apt-get -y --quiet --no-install-recommends install \
+        gz-harmonic \
+        libunwind-dev \
+        gstreamer1.0-plugins-bad \
+        gstreamer1.0-plugins-base \
+        gstreamer1.0-plugins-good \
+        gstreamer1.0-plugins-ugly \
+        gstreamer1.0-libav \
+        libeigen3-dev \
+        libgstreamer-plugins-base1.0-dev \
+        libimage-exiftool-perl \
+        libopencv-dev \
+        libxml2-utils \
+        mesa-utils \
+        protobuf-compiler \
+        x-window-system \
+    && apt-get -y autoremove \
+    && apt-get clean autoclean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+#
+# Gazebo / Qt settings
+#
+
+ENV QT_X11_NO_MITSHM=1
+
+#
+# Use UTF-8 encoding in Java tools.
+# Needed for jMAVSim.
+#
+
+ENV JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF8
+
+#
+# JSBSim
+#
+
+RUN wget -q https://github.com/JSBSim-Team/jsbsim/releases/download/v1.1.1a/JSBSim-devel_1.1.1-134.focal.amd64.deb \
+        -O /tmp/JSBSim-devel.deb \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends /tmp/JSBSim-devel.deb \
+    && rm -f /tmp/JSBSim-devel.deb \
+    && apt-get clean autoclean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+#
+# SITL UDP ports
+#
+
+EXPOSE 14556/udp
+EXPOSE 14557/udp
+
+#
+# Minimal local-user entrypoint.
+#
+# Use LOCAL_USER_ID / LOCAL_GROUP_ID to run the container as the host user.
+#
+
+RUN cat > /usr/local/bin/entrypoint.sh <<'EOF'
+#!/bin/bash
+set -e
+
+USER_ID="${LOCAL_USER_ID:-1001}"
+GROUP_ID="${LOCAL_GROUP_ID:-1001}"
+USERNAME="${LOCAL_USER_NAME:-px4user}"
+
+EXISTING_USER_BY_NAME="$(id -u "$USERNAME" 2>/dev/null || true)"
+
+if [ -n "$EXISTING_USER_BY_NAME" ] && [ "$EXISTING_USER_BY_NAME" != "$USER_ID" ]; then
+    USERNAME="px4runtime"
+fi
+
+if ! getent group "$GROUP_ID" >/dev/null 2>&1; then
+    groupadd -g "$GROUP_ID" "$USERNAME" || true
+fi
+
+if ! id -u "$USERNAME" >/dev/null 2>&1; then
+    useradd --shell /bin/bash -u "$USER_ID" -g "$GROUP_ID" -m "$USERNAME" || true
+    usermod -a -G dialout "$USERNAME" || true
+fi
+
+export XDG_RUNTIME_DIR="/tmp/runtime-${USERNAME}"
+mkdir -p "$XDG_RUNTIME_DIR"
+chown "$USER_ID:$GROUP_ID" "$XDG_RUNTIME_DIR" || true
+chmod 700 "$XDG_RUNTIME_DIR" || true
+
+exec gosu "$USERNAME" "$@"
+EOF
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+WORKDIR /workspace
+
+CMD ["/bin/bash"]
