@@ -22,12 +22,12 @@ docker run --init -it --rm --privileged \
   --env=LOCAL_GROUP_ID="$(id -g)" \
   --env=GZ_PARTITION=sim \
   --env=CCACHE_DIR="${CCACHE_DIR}" \
-  -v "${SCRIPT_DIR}:/workspace:rw" \
+  -v "${SCRIPT_DIR}:/PX4-Autopilot:rw" \
   -v /dev:/dev \
   -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
   -v "${CCACHE_DIR}:${CCACHE_DIR}:rw" \
   -e DISPLAY="${DISPLAY}" \
   --network=host \
-  -w /workspace \
+  -w /PX4-Autopilot \
   "${IMAGE_NAME}" \
   "$@"
