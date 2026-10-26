@@ -6,6 +6,18 @@
 
 [![Discord Shield](https://discordapp.com/api/guilds/1022170275984457759/widget.png?style=shield)](https://discord.gg/dronecode)
 
+## MAVTech Firmware Releases
+
+Firmware PX4 personalizzato per flight controller FMUv6X e configurazione multicottero.
+La pipeline GitHub Actions compila il firmware e pubblica automaticamente una nuova
+[Release MAVTech](https://github.com/MAVTech-srl/PX4-Autopilot/releases) dopo ogni build riuscita.
+
+| Versione | Data | Modifiche principali | File |
+| --- | --- | --- | --- |
+| [1.16.001](https://github.com/MAVTech-srl/PX4-Autopilot/releases/tag/firmware-v1.16.001) | 2026-10-26 | Prima release automatica FMUv6X multicottero; Precision Landing con ricerca del target, traiettoria a spirale, filtraggio degli outlier, predizione del movimento e allineamento yaw. | `.px4`, `.bin` |
+
+Prima di pubblicare una nuova versione, aggiungere una riga in cima alla tabella con una breve descrizione delle modifiche principali. Il file `.px4` è destinato a QGroundControl; il file `.bin` è disponibile per il flashing diretto.
+
 This repository holds the [PX4](http://px4.io) flight control solution for drones, with the main applications located in the [src/modules](https://github.com/PX4/PX4-Autopilot/tree/main/src/modules) directory. It also contains the PX4 Drone Middleware Platform, which provides drivers and middleware to run drones.
 
 PX4 is highly portable, OS-independent and supports Linux, NuttX and MacOS out of the box.
