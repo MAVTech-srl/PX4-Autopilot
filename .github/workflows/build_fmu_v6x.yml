@@ -35,6 +35,7 @@ jobs:
 
       - name: Determine release version
         id: version
+        shell: bash
         run: |
           latest_tag="$(git tag --list "firmware-v${FIRMWARE_VERSION_SERIES}.*" --sort=-v:refname | head -n 1)"
           sequence=1
