@@ -593,7 +593,7 @@ bool PrecLand::update_target_estimate()
 					_consecutive_outlier_rejections++;
 					PX4_WARN("Reject target outlier %.2fm (max %.2fm), %d/%d",
 						 (double)innovation, (double)max_plausible,
-						 _consecutive_outlier_rejections, _param_pld_out_max.get());
+						 _consecutive_outlier_rejections, static_cast<int>(_param_pld_out_max.get()));
 					return false;
 				}
 
