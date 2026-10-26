@@ -1,0 +1,41 @@
+name: Build FMU v6x firmware
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-fmu-v6x-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build px4_fmu-v6x_default
+    runs-on: ubuntu-latest
+    container:
+      image: px4io/px4-dev-nuttx-focal:2022-08-12
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build firmware
+        run: make px4_fmu-v6x_default
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: px4_fmu-v6x_default-${{ github.sha }}
+          path: |
+            build/px4_fmu-v6x_default/px4_fmu-v6x_default.px4
+            build/px4_fmu-v6x_default/px4_fmu-v6x_default.bin
+            build/px4_fmu-v6x_default/px4_fmu-v6x_default.elf
+          if-no-files-found: error
+          retention-days: 30
