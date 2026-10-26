@@ -1,4 +1,4 @@
-name: Build FMU v6x firmware
+name: Build FMU v6x multicopter firmware
 
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build px4_fmu-v6x_default
+    name: Build px4_fmu-v6x_multicopter
     runs-on: ubuntu-latest
     container:
       image: px4io/px4-dev-nuttx-focal:2022-08-12
@@ -28,15 +28,15 @@ jobs:
           submodules: recursive
 
       - name: Build firmware
-        run: make px4_fmu-v6x_default
+        run: make px4_fmu-v6x_multicopter
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
-          name: px4_fmu-v6x_default-${{ github.sha }}
+          name: px4_fmu-v6x_multicopter-${{ github.sha }}
           path: |
-            build/px4_fmu-v6x_default/px4_fmu-v6x_default.px4
-            build/px4_fmu-v6x_default/px4_fmu-v6x_default.bin
-            build/px4_fmu-v6x_default/px4_fmu-v6x_default.elf
+            build/px4_fmu-v6x_multicopter/px4_fmu-v6x_multicopter.px4
+            build/px4_fmu-v6x_multicopter/px4_fmu-v6x_multicopter.bin
+            build/px4_fmu-v6x_multicopter/px4_fmu-v6x_multicopter.elf
           if-no-files-found: error
           retention-days: 30
