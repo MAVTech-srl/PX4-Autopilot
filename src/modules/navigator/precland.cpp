@@ -764,7 +764,7 @@ bool PrecLand::update_search_reference(uint64_t now)
 			}
 
 		} else {
-			const int turns = math::max(_param_pld_srch_turns.get(), 1);
+			const int turns = math::max(static_cast<int>(_param_pld_srch_turns.get()), 1);
 			const float angular_speed = math::radians(math::max(_param_pld_srch_omega.get(), 1.f));
 			const float total_angle = 2.f * M_PI_F * static_cast<float>(turns);
 			const float angle = math::min(angular_speed * elapsed, total_angle);
