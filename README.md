@@ -11,6 +11,9 @@
 Firmware PX4 personalizzato per flight controller FMUv6X e configurazione multicottero.
 La pipeline GitHub Actions compila il firmware e pubblica automaticamente una nuova
 [Release MAVTech](https://github.com/MAVTech-srl/PX4-Autopilot/releases) dopo ogni build riuscita.
+Ogni push su `main` crea un tag annotato progressivo (`v1.16.0-0.0.1`,
+`v1.16.0-0.0.2`, ...) e genera file con numero di release a tre cifre, per esempio
+`MAVTech-PX4-v1.16.0-R002.px4` e `MAVTech-PX4-v1.16.0-R002.bin`.
 
 | Versione | Data | Modifiche principali | File |
 | --- | --- | --- | --- |

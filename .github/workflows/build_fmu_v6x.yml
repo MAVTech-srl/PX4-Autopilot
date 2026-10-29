@@ -10,11 +10,7 @@ permissions:
   contents: write
 
 env:
-  FIRMWARE_VERSION_SERIES: "1.16"
-
-concurrency:
-  group: build-fmu-v6x-${{ github.ref }}
-  cancel-in-progress: true
+  FIRMWARE_VERSION: "1.16.0"
 
 jobs:
   build:
@@ -33,34 +29,55 @@ jobs:
       - name: Build firmware
         run: make px4_fmu-v6x_multicopter
 
-      - name: Determine release version
+      - name: Create and push sequential annotated tag
         id: version
         shell: bash
         run: |
-          latest_tag="$(git tag --list "firmware-v${FIRMWARE_VERSION_SERIES}.*" --sort=-v:refname | head -n 1)"
-          sequence=1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if [[ "${latest_tag}" =~ ^firmware-v[0-9]+\.[0-9]+\.([0-9]+)$ ]]; then
-            sequence=$((10#${BASH_REMATCH[1]} + 1))
-          fi
+          for attempt in {1..10}; do
+            git fetch --force --tags origin
 
-          printf -v build_number '%03d' "${sequence}"
-          version="${FIRMWARE_VERSION_SERIES}.${build_number}"
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+            latest_tag="$(git tag --list "v${FIRMWARE_VERSION}-0.0.*" --sort=-v:refname | head -n 1)"
+            sequence=1
+
+            if [[ "${latest_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-0\.0\.([0-9]+)$ ]]; then
+              sequence=$((10#${BASH_REMATCH[1]} + 1))
+            fi
+
+            printf -v release_number '%03d' "${sequence}"
+            tag="v${FIRMWARE_VERSION}-0.0.${sequence}"
+            git tag -a "${tag}" \
+              -m "MAVTech PX4 ${FIRMWARE_VERSION} - Release ${release_number}" \
+              "${GITHUB_SHA}"
+
+            if git push origin "${tag}"; then
+              echo "sequence=${sequence}" >> "${GITHUB_OUTPUT}"
+              echo "release_number=${release_number}" >> "${GITHUB_OUTPUT}"
+              echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
+
+            git tag --delete "${tag}"
+          done
+
+          echo "Unable to reserve a sequential firmware tag after 10 attempts" >&2
+          exit 1
 
       - name: Prepare release files
         run: |
           mkdir -p release
           cp build/px4_fmu-v6x_multicopter/px4_fmu-v6x_multicopter.px4 \
-            "release/MAVTech-PX4-v6x-multicopter-${{ steps.version.outputs.version }}.px4"
+            "release/MAVTech-PX4-v${FIRMWARE_VERSION}-R${{ steps.version.outputs.release_number }}.px4"
           cp build/px4_fmu-v6x_multicopter/px4_fmu-v6x_multicopter.bin \
-            "release/MAVTech-PX4-v6x-multicopter-${{ steps.version.outputs.version }}.bin"
+            "release/MAVTech-PX4-v${FIRMWARE_VERSION}-R${{ steps.version.outputs.release_number }}.bin"
           sha256sum release/*.px4 release/*.bin > release/SHA256SUMS.txt
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
-          name: MAVTech-firmware-${{ steps.version.outputs.version }}
+          name: MAVTech-PX4-v${{ env.FIRMWARE_VERSION }}-R${{ steps.version.outputs.release_number }}
           path: release/
           if-no-files-found: error
           retention-days: 30
@@ -68,13 +85,14 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: firmware-v${{ steps.version.outputs.version }}
-          name: MAVTech Firmware ${{ steps.version.outputs.version }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: MAVTech PX4 ${{ env.FIRMWARE_VERSION }} - Release ${{ steps.version.outputs.release_number }}
           target_commitish: ${{ github.sha }}
           body: |
             Firmware PX4 per FMUv6X multicopter.
 
-            Versione: ${{ steps.version.outputs.version }}
+            Versione: ${{ env.FIRMWARE_VERSION }}
+            Release: ${{ steps.version.outputs.release_number }}
             Target: px4_fmu-v6x_multicopter
             Commit: ${{ github.sha }}
 
