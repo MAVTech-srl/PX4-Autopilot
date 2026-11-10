@@ -3,7 +3,7 @@ name: Build FMU v6x multicopter firmware
 on:
   push:
     branches:
-      - main
+      - release
   workflow_dispatch:
 
 permissions:
@@ -56,6 +56,7 @@ jobs:
               echo "sequence=${sequence}" >> "${GITHUB_OUTPUT}"
               echo "release_number=${release_number}" >> "${GITHUB_OUTPUT}"
               echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+              echo "previous_tag=${latest_tag}" >> "${GITHUB_OUTPUT}"
               exit 0
             fi
 
@@ -82,20 +83,43 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Generate release changelog
+        shell: bash
+        env:
+          PREVIOUS_TAG: ${{ steps.version.outputs.previous_tag }}
+          CURRENT_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_NUMBER: ${{ steps.version.outputs.release_number }}
+        run: |
+          {
+            echo "Firmware PX4 per FMUv6X multicopter."
+            echo
+            echo "Versione: ${FIRMWARE_VERSION}"
+            echo "Release: ${RELEASE_NUMBER}"
+            echo "Target: px4_fmu-v6x_multicopter"
+            echo "Commit: ${GITHUB_SHA}"
+            echo
+            echo "## Modifiche dalla release precedente"
+            echo
+
+            if [[ -n "${PREVIOUS_TAG}" ]]; then
+              git log --no-merges --pretty=format:'- %s (`%h`)' "${PREVIOUS_TAG}..${GITHUB_SHA}"
+              echo
+              echo
+              echo "**Confronto completo**: https://github.com/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG}...${CURRENT_TAG}"
+            else
+              echo "- Prima release della serie ${FIRMWARE_VERSION}."
+            fi
+
+            echo
+            echo "Usa il file .px4 con QGroundControl oppure il file .bin per il flashing diretto."
+          } > release-notes.md
+
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: MAVTech PX4 ${{ env.FIRMWARE_VERSION }} - Release ${{ steps.version.outputs.release_number }}
           target_commitish: ${{ github.sha }}
-          body: |
-            Firmware PX4 per FMUv6X multicopter.
-
-            Versione: ${{ env.FIRMWARE_VERSION }}
-            Release: ${{ steps.version.outputs.release_number }}
-            Target: px4_fmu-v6x_multicopter
-            Commit: ${{ github.sha }}
-
-            Usa il file .px4 con QGroundControl oppure il file .bin per il flashing diretto.
+          body_path: release-notes.md
           files: release/*
           fail_on_unmatched_files: true
