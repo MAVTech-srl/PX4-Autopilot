@@ -1,7 +1,7 @@
 [submodule "src/modules/mavlink/mavlink"]
 	path = src/modules/mavlink/mavlink
 	url = git@github.com:MAVTech-srl/mavlink.git
-	branch = px4-v1.16-mavtech
+	branch = master
 [submodule "Tools/simulation/jmavsim/jMAVSim"]
 	path = Tools/simulation/jmavsim/jMAVSim
 	url = https://github.com/PX4/jMAVSim.git
